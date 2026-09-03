@@ -1,0 +1,19 @@
+import { run } from './orm';
+import { User } from './entities/User';
+
+// ===== BAI 2 - Unit of Work =====
+// Khong he goi persist / update / save. Chi gan property JS binh thuong.
+
+run(async (em) => {
+
+  const u = await em.findOne(User, 1);
+
+  u!.name = 'Ten moi';
+
+  await em.flush();          // -> begin / update / commit
+
+  // --- Bai tap A: doi thanh u!.name = 'Than' (gia tri cu) -> khong co begin
+  // --- Bai tap B: goi flush() hai lan -> lan hai khong sinh gi
+  // --- Bai tap C: chen em.clear() truoc flush() -> mat luon update
+
+});

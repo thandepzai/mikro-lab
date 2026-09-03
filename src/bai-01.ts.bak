@@ -1,0 +1,19 @@
+import { run } from './orm';
+import { User } from './entities/User';
+
+// ===== BAI 1 - Identity Map =====
+// Trong DB co san: id = 1, name = 'Than'
+
+run(async (em) => {
+
+  const a = await em.findOne(User, 1);
+  const b = await em.findOne(User, 1);
+
+  console.log('a === b ?', a === b);        // true, 1 cau SQL
+
+  // --- Bai tap A: chen em.clear() vao giua -> false, 2 cau SQL
+  // --- Bai tap B: doi dong b thanh tim bang name:
+  //     const b = await em.findOne(User, { name: 'Than' });
+  //     -> van true, nhung 2 cau SQL
+
+});
