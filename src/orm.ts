@@ -1,10 +1,12 @@
 import 'reflect-metadata';
 import { MikroORM } from '@mikro-orm/sqlite';
 import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
-import type { EntityManager } from '@mikro-orm/core';
+import type { EntityManager, MikroORM as CoreORM } from '@mikro-orm/core';
 import { User } from './entities/User';
 
-export async function run(baiTap: (em: EntityManager) => Promise<void>) {
+type BaiTap = (em: EntityManager, orm: CoreORM) => Promise<void>;
+
+export async function run(baiTap: BaiTap) {
   const orm = await MikroORM.init({
     entities: [User],
     dbName: ':memory:',
@@ -17,6 +19,6 @@ export async function run(baiTap: (em: EntityManager) => Promise<void>) {
   await em.flush();
   em.clear();
   console.log('\n---------- BAT DAU ----------\n');
-  await baiTap(em);
+  await baiTap(em, orm);
   await orm.close(true);
 }

@@ -1,0 +1,29 @@
+import { run } from './orm';
+import { User } from './entities/User';
+
+// ===== BAI 3 - em.fork() =====
+// Gia bo day la 2 request vao server cung mot luc, DUNG CHUNG mot em.
+
+run(async (em) => {
+
+  const emA = em;                 // Request A
+  const emB = em.fork();;                 // Request B
+
+  const a = await emA.findOne(User, 1);
+  a!.name = 'A dang sua, CHUA luu';
+
+  const b = await emB.findOne(User, 1);
+
+  console.log('>> B nhin thay :', b!.name);
+  console.log('>> a === b ?   ', a === b);
+
+  await emB.flush();              // B flush. Nhung ghi xuong DB cai gi?
+
+  // --- Bai tap A: doi dong emB thanh   const emB = em.fork();
+  //     Chay lai, xem 3 dong log tren va log SQL khac di the nao.
+
+});
+
+// KET QUA:
+//   Dung chung em -> 1 select | B thay 'A dang sua, CHUA luu' | a === b true | co begin+update
+//   em.fork()     -> 2 select | B thay 'Than'                 | a === b false | KHONG co begin

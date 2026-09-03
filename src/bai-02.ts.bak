@@ -17,3 +17,15 @@ run(async (em) => {
   // --- Bai tap C: chen em.clear() truoc flush() -> mat luon update
 
 });
+
+// ===== KET LUAN BAI 2 (code da chay) =====
+// run(async (em) => {
+//   const u = await em.findOne(User, 1);
+//   u!.name = 'Ten moi';
+//   em.clear();
+//   await em.flush();                                    // khong co begin
+//   console.log('>> Object trong RAM  :', u!.name);      // 'Ten moi'  <- VAN DOI
+//   const check = await em.findOne(User, 1);
+//   console.log('>> Gia tri trong DB  :', check!.name);  // 'Than'     <- KHONG doi
+//   console.log('>> u === check ?     ', u === check);   // false
+// });

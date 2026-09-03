@@ -18,13 +18,17 @@ npm run dev
 SQLite in-memory — không cần Docker, không cần Postgres, không cần config gì.
 Trong DB luôn có sẵn 1 dòng: `id = 1, name = 'Than', email = 'than@example.com'`.
 
+> **Node 20 → segfault.** `@mikro-orm/sqlite` v7 ghim `better-sqlite3@13`, bản này yêu cầu Node >= 22.
+> Chạy trên Node 20 thì process chết ngay (exit 139) mà không có message. Repo đã hạ xuống bằng
+> `overrides` trong `package.json`. Nếu sau này nâng lên Node 22+ thì xoá `overrides` đi.
+
 ## Quy ước trong repo
 
 | Đường dẫn | Vai trò |
 |---|---|
 | `src/main.ts` | **Bài đang học.** Chỉ sửa file này. |
 | `src/bai-NN.ts.bak` | Bài đã học xong, lưu lại kèm ghi chú đáp án. Không compile. |
-| `src/orm.ts` | Phần dọn dẹp: mở DB, tạo bảng, seed. Mở ra đọc từ Chương 1 bài 4 trở đi. |
+| `src/orm.ts` | Phần dọn dẹp: mở DB, tạo bảng, seed. Truyền `(em, orm)` vào bài tập. Mở ra đọc từ Chương 1 bài 4 trở đi. |
 | `src/entities/` | Entity dùng cho các bài. |
 
 Học xong một bài: `cp src/main.ts src/bai-NN.ts.bak` rồi viết bài mới vào `main.ts`.
@@ -46,7 +50,7 @@ Học xong một bài: `cp src/main.ts src/bai-NN.ts.bak` rồi viết bài mớ
 
 - [x] **1. Identity Map** — vì sao `findOne` 2 lần chỉ ra 1 câu SQL
 - [x] **2. Unit of Work** — vì sao sửa property là đủ, không cần `persist`
-- [ ] **3. `em.fork()` và `RequestContext`** — vì sao NestJS bắt buộc phải có, thiếu thì nổ thế nào
+- [x] **3. `em.fork()` và `RequestContext`** — vì sao NestJS bắt buộc phải có, thiếu thì nổ thế nào
 - [ ] **4. 4 trạng thái của entity** — new / managed / detached / removed; `persist`, `remove`, `merge`
 - [ ] **5. Đọc hiểu `orm.ts`** — quay lại mổ file đã bỏ qua từ bài 1
 
@@ -137,6 +141,52 @@ Object vẫn giữ giá trị mới trong RAM — thứ bị mất là quan hệ
 → Đây là loại bug tệ nhất: **âm thầm**. Không exception, API trả `200 OK`, mà DB không đổi.
 Nếu gặp cảnh "gọi API không lỗi gì mà data không lưu" → 90% là entity đã bị detached.
 
+### Bài 3 — `em.fork()` và `RequestContext` ✅ (03/09/2026) → `src/bai-03a.ts.bak`, `src/bai-03b.ts.bak`
+
+**Vấn đề:** hai request dùng chung một `em` thì dùng chung luôn `identityMap` và Unit of Work.
+
+| Dùng chung `em` | Kết quả |
+|---|---|
+| B `findOne` sau khi A sửa dở | Chỉ 1 câu `select` — B nhận **đúng object A đang sửa** |
+| B gọi `flush()` | `begin` + `update` — **B ghi hộ A** |
+
+`flush()` không flush "phần của B". Nó flush **cả Unit of Work**.
+
+→ Hai lỗi cùng lúc: **ghi nhầm** (data A chưa validate xong đã nằm trong DB) và
+**đọc nhầm** (B thấy dữ liệu của A — lộ dữ liệu chéo user/tenant).
+Chỉ nổ khi hai request chồng nhau về thời gian → test một mình không bao giờ thấy.
+
+**`em.fork()`** = `em` mới, `identityMap` rỗng, ảnh chụp rỗng. Mỗi request một cái. Không có ngoại lệ.
+
+**`RequestContext.create(orm.em, cb)`** = `fork()` tự động + `AsyncLocalStorage`.
+
+Biến `orm.em` **không đổi** — thứ đổi theo context là cái `em` mà method của nó lấy ra dùng.
+Nên trong Nest cứ `inject EntityManager` một lần rồi dùng thoải mái.
+
+```ts
+// MikroOrmModule tự đăng ký cho mọi HTTP request
+app.use((req, res, next) => RequestContext.create(orm.em, next));
+```
+
+**Gọi `orm.em` ngoài mọi context → nổ:**
+
+```
+ValidationError: Using global EntityManager instance methods for context specific
+actions is disallowed. If you need to work with the global instance's identity map,
+use `allowGlobalContext` configuration option or `fork()` instead.
+```
+
+| Cách sửa | Đánh giá |
+|---|---|
+| `fork()` / `RequestContext` | ✅ Đúng |
+| `allowGlobalContext: true` | ⚠️ **Bẫy.** Tắt chốt an toàn → bug ở trên quay lại nguyên vẹn |
+
+Câu trả lời đầu tiên trên Google luôn là `allowGlobalContext`. Chỉ đúng cho test/script một luồng.
+
+**Chỗ `RequestContext` KHÔNG tự chạy** (không đi qua HTTP middleware) — đúng những chỗ ăn lỗi trên:
+`@Cron()`, BullMQ consumer, `@OnEvent()`, websocket gateway, script CLI.
+→ Bọc bằng `@CreateRequestContext()`. Chi tiết ở bài 17.
+
 ---
 
 ## Ghi chú MikroORM v6 → v7
@@ -171,6 +221,6 @@ Bản `@mikro-orm/decorators/es` là decorator theo chuẩn ES mới, chưa dùn
   chấm bài rồi mới sang bài kế.
 - **Không làm:** đừng đưa nhiều thí nghiệm trong một file, đừng giải thích lý thuyết dài
   trước khi họ chạy code.
-- **Tiếp theo:** bài 3 — `em.fork()` và `RequestContext`.
+- **Tiếp theo:** bài 4 — 4 trạng thái của entity (new / managed / detached / removed).
 - **Còn treo:** project ở công ty đang chạy MikroORM version mấy? (`npm ls @mikro-orm/core`)
   Nếu là v6 thì phần `import` và cấu hình sẽ khác sandbox này.

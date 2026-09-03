@@ -22,3 +22,12 @@ run(async (em, orm) => {
   //     Doc ky message loi.
 
 });
+
+// KET QUA: giong het em.fork(). RequestContext.create = fork() + AsyncLocalStorage.
+//
+// Bai tap A - bo RequestContext di, goi orm.em tran:
+//   ValidationError: Using global EntityManager instance methods for context specific
+//   actions is disallowed. If you need to work with the global instance's identity map,
+//   use `allowGlobalContext` configuration option or `fork()` instead.
+//
+//   -> allowGlobalContext: true la BAY. Het loi nhung bug ro du lieu quay lai nguyen ven.
