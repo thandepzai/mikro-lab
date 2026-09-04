@@ -22,3 +22,14 @@ export async function run(baiTap: BaiTap) {
   await baiTap(em, orm);
   await orm.close(true);
 }
+
+export function trangThai(em: EntityManager, e: any): string {
+  const uow: any = em.getUnitOfWork();
+  const coId = e.id !== undefined && e.id !== null;
+  const trongMap = coId && !!uow.getById(e.constructor.name, e.id);
+  if (uow.getRemoveStack().has(e)) return 'REMOVED';
+  if (trongMap) return 'MANAGED';
+  if (uow.getPersistStack().has(e)) return 'NEW (da xep hang, cho flush)';
+  if (coId) return 'DETACHED';
+  return 'NEW';
+}

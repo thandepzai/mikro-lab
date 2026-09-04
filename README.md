@@ -44,6 +44,79 @@ Học xong một bài: `cp src/main.ts src/bai-NN.ts.bak` rồi viết bài mớ
 
 ---
 
+## `em` thực chất là cái gì
+
+Không có gì huyền bí. Chỉ là **object JS bình thường** giữ vài cái `Map` / `Set`:
+
+```js
+em = {
+  identityMap:  new Map(),   // bài 1: đang giữ object nào
+  persistStack: new Set(),   // bài 4: hàng chờ INSERT
+  removeStack:  new Set(),   // bài 4: hàng chờ DELETE
+}
+```
+
+### Ảnh chụp gốc KHÔNG nằm trong `em`
+
+Bài 2 tôi vẽ `original: new Map()` nằm trong `em`. **Sai.** Ảnh chụp lúc load được gắn thẳng
+lên **chính object entity**, ở một property ẩn:
+
+```js
+u = {
+  id: 1, name: 'Than', email: 'than@example.com',
+
+  __originalEntityData: { id: 1, name: 'Than', email: 'than@example.com' },   // <- ẩn
+}
+```
+
+`em` không giữ bản sao — khi cần so, nó **đọc ngược ra từ object**. Kiểm chứng:
+
+```ts
+em.clear();
+uow.getOriginalEntityData(u)        // -> {"id":1,"name":"Than",...}  vẫn còn nguyên
+helper(u).__originalEntityData      // -> giống hệt
+```
+
+→ **`em.clear()` dọn `identityMap` nhưng không đụng được vào ảnh chụp.** Object detached vẫn
+tự mang theo bằng chứng *"tao từ DB ra, tao không mới"*.
+
+Đây là lý do `persist()` một object đã `clear()` **không bao giờ INSERT**, và **không cần hỏi
+DB câu nào** — nó nhìn cái property ẩn đó là biết. Chi tiết ở [bài 4](#persist-trên-một-object-đã-detached).
+
+### Ba hàm hay dùng nhất, viết lại bằng JS thuần
+
+```js
+em.persist(u)  →  persistStack.add(u)      // xong. Không đụng DB.
+em.remove(u)   →  removeStack.add(u)       // xong. Không đụng DB.
+
+em.flush()     →  begin
+                  persistStack  → sinh INSERT
+                  so identityMap với original → sinh UPDATE
+                  removeStack   → sinh DELETE
+                  commit
+```
+
+> **`persist` và `remove` chỉ là ghi vào sổ. `flush` mới là người đi làm.**
+
+Đây là bài 2 nói tiếp: bài 2 không gọi `persist` mà vẫn `update` được, vì `flush` tự so
+`identityMap` với `original`. `persist` sinh ra là để xử lý object **mới toanh** — chưa nằm
+trong `identityMap` nên không có gì để so.
+
+### Bảng tên trạng thái
+
+`trangThai()` trong `src/orm.ts` là **hàm tự viết**, không phải API MikroORM.
+Nó chỉ nhìn xem object đang nằm trong cái nào ở trên rồi đặt tên:
+
+| Nằm ở đâu | Tên gọi |
+|---|---|
+| Không ở đâu cả | `NEW` |
+| Trong `persistStack` | `NEW`, đang chờ flush |
+| Trong `identityMap` | `MANAGED` |
+| Trong `removeStack` | `REMOVED` |
+| Có `id` nhưng không ở đâu cả | `DETACHED` |
+
+---
+
 ## Lộ trình
 
 ### Chương 1 — Lõi ORM (chưa đụng NestJS)
@@ -51,7 +124,7 @@ Học xong một bài: `cp src/main.ts src/bai-NN.ts.bak` rồi viết bài mớ
 - [x] **1. Identity Map** — vì sao `findOne` 2 lần chỉ ra 1 câu SQL
 - [x] **2. Unit of Work** — vì sao sửa property là đủ, không cần `persist`
 - [x] **3. `em.fork()` và `RequestContext`** — vì sao NestJS bắt buộc phải có, thiếu thì nổ thế nào
-- [ ] **4. 4 trạng thái của entity** — new / managed / detached / removed; `persist`, `remove`, `merge`
+- [x] **4. 4 trạng thái của entity** — new / managed / detached / removed; `persist`, `remove`, `merge`
 - [ ] **5. Đọc hiểu `orm.ts`** — quay lại mổ file đã bỏ qua từ bài 1
 
 ### Chương 2 — Quan hệ và truy vấn
@@ -120,6 +193,10 @@ em = {
 }
 ```
 
+> ⚠️ **Đính chính ở bài 4:** `original` không nằm trong `em`. Nó được gắn thẳng lên chính object
+> entity (`__originalEntityData`), nên nó **sống sót qua `em.clear()`**. Xem
+> [`em` thực chất là cái gì](#em-thực-chất-là-cái-gì). Phần còn lại của bài 2 vẫn đúng.
+
 **Bài tập đã làm:**
 
 | Thí nghiệm | Kết quả | Vì sao |
@@ -187,6 +264,93 @@ Câu trả lời đầu tiên trên Google luôn là `allowGlobalContext`. Chỉ
 `@Cron()`, BullMQ consumer, `@OnEvent()`, websocket gateway, script CLI.
 → Bọc bằng `@CreateRequestContext()`. Chi tiết ở bài 17.
 
+### Bài 4 — 4 trạng thái của entity ✅ (04/09/2026) → `src/bai-04a/b/c.ts.bak`
+
+Xem mục [`em` thực chất là cái gì](#em-thực-chất-là-cái-gì) ở trên cho mô hình `Map`/`Set`.
+
+**Vòng đời một entity:**
+
+```
+new User()  --persist()-->  [persistStack]  --flush()-->  MANAGED
+                                                             |
+                                                          remove()
+                                                             v
+                                                         REMOVED
+                                                             |
+                                                          flush()  (delete)
+                                                             v
+                                                         DETACHED
+```
+
+**Không hàm nào trong `persist` / `remove` / `merge` sinh ra SQL.** Chỉ ghi vào sổ, `flush` mới đi làm.
+
+| | Ý nghĩa | Sinh SQL lúc gọi |
+|---|---|---|
+| `persist` | "object này là **mới**, đi INSERT" | Không |
+| `remove` | "object này đi DELETE" | Không |
+| `merge` | "object này **đã có sẵn** trong DB, quản lại đi" | Không |
+
+**Ai cấp `id`?** DB, không phải MikroORM. Bằng chứng nằm trong chính câu SQL:
+
+```sql
+insert into `user` (`name`, `email`) values (...) returning `id`
+```
+
+Không gửi cột `id` đi, và `returning id` để lấy về. DB sinh (`autoincrement`), MikroORM gán
+ngược vào `u.id`. → Đó là lý do trước `flush()` thì `u.id === undefined`.
+
+**Vì sao bài 2 không cần `persist`?** Object load từ DB đã nằm sẵn trong `identityMap` + có ảnh
+chụp `original` → `flush` tự so ra chỗ khác. `new User()` không có gì để so, không `persist`
+thì `flush` không biết nó tồn tại.
+
+### `persist()` trên một object đã `DETACHED`
+
+**Ảnh chụp gốc nằm trên chính object entity, không phải chỉ trong `em`.** `em.clear()` dọn các
+`Map` của `em` nhưng **không đụng** vào ảnh chụp gắn trên object. Nên object detached vẫn tự
+mang theo bằng chứng *"tao từ DB ra, tao không mới"*.
+
+→ Hệ quả: `persist()` một object như vậy **không bao giờ INSERT**, và **không hỏi DB câu nào**
+(cả 3 kịch bản dưới đây đều 0 câu `select`). Nó nhìn cái cờ trên object là biết.
+
+Kết quả thật, đã chạy:
+
+| Sau `em.clear()` | SQL sinh ra | Trạng thái sau `flush` |
+|---|---|---|
+| `persist` → `flush` (chưa sửa gì) | không có gì | `DETACHED` — **sửa sau đó cũng vô hiệu** |
+| sửa → `persist` → `flush` | `update` `[1 row affected]` | `DETACHED` — ghi đúng **một phát** rồi buông |
+| `merge` → sửa → `flush` | `update` `[1 row affected]` | `MANAGED` — quản lại thật sự |
+
+> **`persist` trên detached là phát một lần** — ghi cái diff đang có tại đúng thời điểm `flush`
+> rồi thả tay, không đưa object trở lại `identityMap`. **`merge` mới là gắn lại.**
+
+Dòng 1 là bug bài 2: không exception, log sạch, DB không đổi.
+
+**Còn detached kiểu khác thì `persist` lại INSERT:**
+
+| Vào detached bằng | Row trong DB | `persist()` + `flush()` |
+|---|---|---|
+| `em.clear()` | vẫn còn | không bao giờ insert (bảng trên) |
+| `remove()` + `flush()` | đã bị xoá | `insert` **kèm cột `id`** (id do `u.id` quyết, không phải DB) |
+
+Vì `remove()` + `flush()` đã gỡ cờ "tao từ DB ra" khỏi object → nó thành `NEW` trở lại.
+
+### `merge()`
+
+```ts
+em.clear();
+em.merge(u);              // -> MANAGED ngay. 0 câu SQL.
+u.name = 'Doi sau merge';
+await em.flush();         // -> update ... [1 row affected]
+```
+
+`merge` nói *"object này tao đảm bảo đã có row trong DB"* — và `em` **tin luôn, không kiểm tra**.
+Nạp thẳng vào `identityMap` + `original`.
+
+→ Mặt trái: merge một object mà row đã bị xoá thật thì `flush` vẫn sinh `update`, và log ghi
+`[0 rows affected]`. Không exception, không cảnh báo. **Câu lệnh rơi vào khoảng không.**
+
+> Khi debug MikroORM, `[N rows affected]` ở cuối dòng log quan trọng ngang câu SQL.
+
 ---
 
 ## Ghi chú MikroORM v6 → v7
@@ -221,6 +385,6 @@ Bản `@mikro-orm/decorators/es` là decorator theo chuẩn ES mới, chưa dùn
   chấm bài rồi mới sang bài kế.
 - **Không làm:** đừng đưa nhiều thí nghiệm trong một file, đừng giải thích lý thuyết dài
   trước khi họ chạy code.
-- **Tiếp theo:** bài 4 — 4 trạng thái của entity (new / managed / detached / removed).
+- **Tiếp theo:** bài 5 — đọc hiểu `src/orm.ts`, file đã bỏ qua từ bài 1.
 - **Còn treo:** project ở công ty đang chạy MikroORM version mấy? (`npm ls @mikro-orm/core`)
   Nếu là v6 thì phần `import` và cấu hình sẽ khác sandbox này.

@@ -1,0 +1,32 @@
+import { run, trangThai } from './orm';
+import { User } from './entities/User';
+
+// ===== BAI 4A - persist() khong ghi gi ca =====
+// Cac dong "---" la moc danh dau. Xem cau SQL roi vao GIUA hai moc nao.
+
+run(async (em) => {
+
+  const u = new User();
+  u.name = 'Moi';
+  u.email = 'moi@example.com';
+  console.log('   trang thai:', trangThai(em, u), '| u.id =', u.id);
+
+  console.log('\n--- SAP GOI em.persist() ---');
+  em.persist(u);
+  console.log('--- persist() XONG ---');
+  console.log('   trang thai:', trangThai(em, u), '| u.id =', u.id);
+
+  console.log('\n--- SAP GOI em.flush() ---');
+  await em.flush();
+  console.log('--- flush() XONG ---');
+  console.log('   trang thai:', trangThai(em, u), '| u.id =', u.id);
+
+});
+
+// KET QUA:
+//   NEW -> em.persist() -> NEW (trong persistStack, 0 cau SQL) -> flush() -> MANAGED, id = 2
+//
+//   insert into `user` (`name`, `email`) values (...) returning `id`
+//     - khong gui cot `id` di   -> MikroORM khong cap id
+//     - `returning id`          -> SQLite cap, tra ve, MikroORM gan nguoc vao u.id
+//   => truoc flush() thi u.id = undefined vi chua ai hoi DB.

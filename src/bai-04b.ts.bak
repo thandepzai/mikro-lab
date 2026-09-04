@@ -1,0 +1,29 @@
+import { run, trangThai } from './orm';
+import { User } from './entities/User';
+
+// ===== BAI 4B - remove() =====
+// Cau truc y het 4A. Lan nay lay user co san trong DB (id = 1).
+
+run(async (em) => {
+
+  const u = (await em.findOne(User, 1))!;
+  console.log('   trang thai:', trangThai(em, u), '| u.name =', u.name);
+
+  console.log('\n--- SAP GOI em.remove() ---');
+  em.remove(u);
+  console.log('--- remove() XONG ---');
+  console.log('   trang thai:', trangThai(em, u), '| u.name =', u.name);
+
+  console.log('\n--- SAP GOI em.flush() ---');
+  await em.flush();
+  console.log('--- flush() XONG ---');
+  console.log('   trang thai:', trangThai(em, u), '| u.name =', u.name);
+
+});
+
+// KET QUA:
+//   MANAGED -> em.remove() -> REMOVED (0 cau SQL) -> flush() -> delete + DETACHED
+//
+//   Sau cung: u.name van la 'Than' trong RAM, nhung row id=1 da bi xoa khoi DB.
+//   DETACHED = object van con trong RAM nhung KHONG nam trong Map/Set nao cua em.
+//   Bug bai 2 quay lai, khac duong toi: bai 2 vao detached bang em.clear().
