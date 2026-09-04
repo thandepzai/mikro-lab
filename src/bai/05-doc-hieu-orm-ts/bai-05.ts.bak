@@ -1,0 +1,23 @@
+import { run } from './orm';
+import { User } from './entities/User';
+
+// ===== BAI 5 - doc hieu orm.ts =====
+// File nay giu nguyen code bai 1. Lan nay khong sua main.ts.
+// Bai tap nam o src/orm.ts: xoa tung dong, chay lai, xem no no the nao.
+
+run(async (em) => {
+
+  const a = await em.findOne(User, 1);
+  const b = await em.findOne(User, 1);
+
+  console.log('a === b ?', a === b);
+
+});
+
+// Bai tap nam o src/orm.ts, xoa tung dong roi chay lai:
+//
+//   xoa `em.clear();`                    -> a === b van true, nhung 0 CAU SQL
+//                                           (seed van con trong identityMap)
+//   xoa `await orm.schema.create();`     -> TableNotFoundException: no such table: user
+//   xoa `metadataProvider: ...`          -> Error: Please provide either 'type' or 'entity'
+//                                           attribute in User.id.

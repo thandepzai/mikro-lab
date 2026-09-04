@@ -27,11 +27,19 @@ Trong DB luôn có sẵn 1 dòng: `id = 1, name = 'Than', email = 'than@example.
 | Đường dẫn | Vai trò |
 |---|---|
 | `src/main.ts` | **Bài đang học.** Chỉ sửa file này. |
-| `src/bai-NN.ts.bak` | Bài đã học xong, lưu lại kèm ghi chú đáp án. Không compile. |
-| `src/orm.ts` | Phần dọn dẹp: mở DB, tạo bảng, seed. Truyền `(em, orm)` vào bài tập. Mở ra đọc từ Chương 1 bài 4 trở đi. |
+| `src/orm.ts` | Phần dọn dẹp: mở DB, tạo bảng, seed, hàm `trangThai()`. Truyền `(em, orm)` vào bài tập. |
 | `src/entities/` | Entity dùng cho các bài. |
+| `src/bai/NN-ten-bai/` | Bài đã học xong: `README.md` ghi chú + các file `.ts.bak`. Không compile. |
 
-Học xong một bài: `cp src/main.ts src/bai-NN.ts.bak` rồi viết bài mới vào `main.ts`.
+Học xong một bài:
+
+```bash
+mkdir -p src/bai/NN-ten-bai
+cp src/main.ts src/bai/NN-ten-bai/bai-NN.ts.bak     # kèm ghi chú kết quả ở cuối file
+```
+
+rồi viết ghi chú vào `src/bai/NN-ten-bai/README.md`, thêm một dòng vào bảng
+[Nhật ký học](#nhật-ký-học), và viết bài mới vào `src/main.ts`.
 
 ## Cách đọc log SQL
 
@@ -81,7 +89,7 @@ helper(u).__originalEntityData      // -> giống hệt
 tự mang theo bằng chứng *"tao từ DB ra, tao không mới"*.
 
 Đây là lý do `persist()` một object đã `clear()` **không bao giờ INSERT**, và **không cần hỏi
-DB câu nào** — nó nhìn cái property ẩn đó là biết. Chi tiết ở [bài 4](#persist-trên-một-object-đã-detached).
+DB câu nào** — nó nhìn cái property ẩn đó là biết. Chi tiết ở [bài 4](src/bai/04-trang-thai-entity/#persist-trên-một-object-đã-detached).
 
 ### Ba hàm hay dùng nhất, viết lại bằng JS thuần
 
@@ -121,11 +129,11 @@ Nó chỉ nhìn xem object đang nằm trong cái nào ở trên rồi đặt t�
 
 ### Chương 1 — Lõi ORM (chưa đụng NestJS)
 
-- [x] **1. Identity Map** — vì sao `findOne` 2 lần chỉ ra 1 câu SQL
-- [x] **2. Unit of Work** — vì sao sửa property là đủ, không cần `persist`
-- [x] **3. `em.fork()` và `RequestContext`** — vì sao NestJS bắt buộc phải có, thiếu thì nổ thế nào
-- [x] **4. 4 trạng thái của entity** — new / managed / detached / removed; `persist`, `remove`, `merge`
-- [ ] **5. Đọc hiểu `orm.ts`** — quay lại mổ file đã bỏ qua từ bài 1
+- [x] **1. Identity Map** — vì sao `findOne` 2 lần chỉ ra 1 câu SQL → [ghi chú](src/bai/01-identity-map/)
+- [x] **2. Unit of Work** — vì sao sửa property là đủ, không cần `persist` → [ghi chú](src/bai/02-unit-of-work/)
+- [x] **3. `em.fork()` và `RequestContext`** — vì sao NestJS bắt buộc phải có, thiếu thì nổ thế nào → [ghi chú](src/bai/03-fork-va-request-context/)
+- [x] **4. 4 trạng thái của entity** — new / managed / detached / removed; `persist`, `remove`, `merge` → [ghi chú](src/bai/04-trang-thai-entity/)
+- [x] **5. Đọc hiểu `orm.ts`** — quay lại mổ file đã bỏ qua từ bài 1 → [ghi chú](src/bai/05-doc-hieu-orm-ts/)
 
 ### Chương 2 — Quan hệ và truy vấn
 
@@ -155,201 +163,15 @@ Nó chỉ nhìn xem object đang nằm trong cái nào ở trên rồi đặt t�
 
 ## Nhật ký học
 
-### Bài 1 — Identity Map ✅ (02/09/2026) → `src/bai-01.ts.bak`
+Mỗi bài một thư mục trong `src/bai/`, gồm `README.md` (ghi chú + đáp án) và các file `.ts.bak` đã chạy.
 
-`em` giữ một cái `Map`, **key là khoá chính**. Trong một `em`, mỗi dòng trong DB
-chỉ tồn tại **duy nhất một object** trong RAM.
-
-```js
-em.identityMap = new Map([ ['User-1', <object user #1>] ]);
-```
-
-| Tìm bằng | Tránh được SQL? | Trả về cùng object? |
+| Bài | Ghi chú | Điểm rút ra |
 |---|---|---|
-| khoá chính | ✅ | ✅ |
-| field khác | ❌ | ✅ vẫn cùng |
-
-Tìm bằng field khác vẫn phải chạy SQL (vì chưa biết ra row nào), nhưng khi DB trả row về
-nó nhìn `id`, thấy đã có trong Map thì **vứt row mới đi**, trả lại object cũ.
-
-→ Hệ quả: **dữ liệu trong RAM luôn thắng dữ liệu vừa lấy từ DB.**
-
-**Bài tập đã làm:**
-- Chèn `em.clear()` vào giữa 2 lần `findOne` → `false`, 2 câu SQL
-- `findOne(User, { name: 'Than' })` sau `findOne(User, 1)` → vẫn `true`, nhưng 2 câu SQL
-
-### Bài 2 — Unit of Work ✅ (02/09/2026) → `src/bai-02.ts.bak`
-
-Không cần `persist` / `update` / `save`. Chỉ gán property JS bình thường rồi `flush()`.
-
-> **`flush()` = so object hiện tại với ảnh chụp lúc load, khác thì ghi.**
-
-`em` giữ **hai** thứ, không phải một:
-
-```js
-em = {
-  identityMap: new Map(),   // đang giữ những object nào
-  original:    new Map(),   // ảnh chụp lúc mới load: { 1: { name: 'Than' } }
-}
-```
-
-> ⚠️ **Đính chính ở bài 4:** `original` không nằm trong `em`. Nó được gắn thẳng lên chính object
-> entity (`__originalEntityData`), nên nó **sống sót qua `em.clear()`**. Xem
-> [`em` thực chất là cái gì](#em-thực-chất-là-cái-gì). Phần còn lại của bài 2 vẫn đúng.
-
-**Bài tập đã làm:**
-
-| Thí nghiệm | Kết quả | Vì sao |
-|---|---|---|
-| Gán lại đúng giá trị cũ | Không có `begin` | So ra giống hệt → không ghi |
-| Gọi `flush()` hai lần | Lần hai không sinh gì | Lần đầu ghi xong đã cập nhật lại ảnh chụp |
-| `em.clear()` trước `flush()` | Mất luôn `update` | Không còn object nào để so |
-
-**Điểm quan trọng nhất của bài 2:** `em.clear()` **không** reset giá trị.
-Object vẫn giữ giá trị mới trong RAM — thứ bị mất là quan hệ *"đang được ORM quản lý"*:
-**managed → detached**.
-
-```
->> Object trong RAM  : Ten moi     <-- vẫn đổi
->> Giá trị trong DB  : Than        <-- không đổi
->> u === check ?      false
-```
-
-→ Đây là loại bug tệ nhất: **âm thầm**. Không exception, API trả `200 OK`, mà DB không đổi.
-Nếu gặp cảnh "gọi API không lỗi gì mà data không lưu" → 90% là entity đã bị detached.
-
-### Bài 3 — `em.fork()` và `RequestContext` ✅ (03/09/2026) → `src/bai-03a.ts.bak`, `src/bai-03b.ts.bak`
-
-**Vấn đề:** hai request dùng chung một `em` thì dùng chung luôn `identityMap` và Unit of Work.
-
-| Dùng chung `em` | Kết quả |
-|---|---|
-| B `findOne` sau khi A sửa dở | Chỉ 1 câu `select` — B nhận **đúng object A đang sửa** |
-| B gọi `flush()` | `begin` + `update` — **B ghi hộ A** |
-
-`flush()` không flush "phần của B". Nó flush **cả Unit of Work**.
-
-→ Hai lỗi cùng lúc: **ghi nhầm** (data A chưa validate xong đã nằm trong DB) và
-**đọc nhầm** (B thấy dữ liệu của A — lộ dữ liệu chéo user/tenant).
-Chỉ nổ khi hai request chồng nhau về thời gian → test một mình không bao giờ thấy.
-
-**`em.fork()`** = `em` mới, `identityMap` rỗng, ảnh chụp rỗng. Mỗi request một cái. Không có ngoại lệ.
-
-**`RequestContext.create(orm.em, cb)`** = `fork()` tự động + `AsyncLocalStorage`.
-
-Biến `orm.em` **không đổi** — thứ đổi theo context là cái `em` mà method của nó lấy ra dùng.
-Nên trong Nest cứ `inject EntityManager` một lần rồi dùng thoải mái.
-
-```ts
-// MikroOrmModule tự đăng ký cho mọi HTTP request
-app.use((req, res, next) => RequestContext.create(orm.em, next));
-```
-
-**Gọi `orm.em` ngoài mọi context → nổ:**
-
-```
-ValidationError: Using global EntityManager instance methods for context specific
-actions is disallowed. If you need to work with the global instance's identity map,
-use `allowGlobalContext` configuration option or `fork()` instead.
-```
-
-| Cách sửa | Đánh giá |
-|---|---|
-| `fork()` / `RequestContext` | ✅ Đúng |
-| `allowGlobalContext: true` | ⚠️ **Bẫy.** Tắt chốt an toàn → bug ở trên quay lại nguyên vẹn |
-
-Câu trả lời đầu tiên trên Google luôn là `allowGlobalContext`. Chỉ đúng cho test/script một luồng.
-
-**Chỗ `RequestContext` KHÔNG tự chạy** (không đi qua HTTP middleware) — đúng những chỗ ăn lỗi trên:
-`@Cron()`, BullMQ consumer, `@OnEvent()`, websocket gateway, script CLI.
-→ Bọc bằng `@CreateRequestContext()`. Chi tiết ở bài 17.
-
-### Bài 4 — 4 trạng thái của entity ✅ (04/09/2026) → `src/bai-04a/b/c.ts.bak`
-
-Xem mục [`em` thực chất là cái gì](#em-thực-chất-là-cái-gì) ở trên cho mô hình `Map`/`Set`.
-
-**Vòng đời một entity:**
-
-```
-new User()  --persist()-->  [persistStack]  --flush()-->  MANAGED
-                                                             |
-                                                          remove()
-                                                             v
-                                                         REMOVED
-                                                             |
-                                                          flush()  (delete)
-                                                             v
-                                                         DETACHED
-```
-
-**Không hàm nào trong `persist` / `remove` / `merge` sinh ra SQL.** Chỉ ghi vào sổ, `flush` mới đi làm.
-
-| | Ý nghĩa | Sinh SQL lúc gọi |
-|---|---|---|
-| `persist` | "object này là **mới**, đi INSERT" | Không |
-| `remove` | "object này đi DELETE" | Không |
-| `merge` | "object này **đã có sẵn** trong DB, quản lại đi" | Không |
-
-**Ai cấp `id`?** DB, không phải MikroORM. Bằng chứng nằm trong chính câu SQL:
-
-```sql
-insert into `user` (`name`, `email`) values (...) returning `id`
-```
-
-Không gửi cột `id` đi, và `returning id` để lấy về. DB sinh (`autoincrement`), MikroORM gán
-ngược vào `u.id`. → Đó là lý do trước `flush()` thì `u.id === undefined`.
-
-**Vì sao bài 2 không cần `persist`?** Object load từ DB đã nằm sẵn trong `identityMap` + có ảnh
-chụp `original` → `flush` tự so ra chỗ khác. `new User()` không có gì để so, không `persist`
-thì `flush` không biết nó tồn tại.
-
-### `persist()` trên một object đã `DETACHED`
-
-**Ảnh chụp gốc nằm trên chính object entity, không phải chỉ trong `em`.** `em.clear()` dọn các
-`Map` của `em` nhưng **không đụng** vào ảnh chụp gắn trên object. Nên object detached vẫn tự
-mang theo bằng chứng *"tao từ DB ra, tao không mới"*.
-
-→ Hệ quả: `persist()` một object như vậy **không bao giờ INSERT**, và **không hỏi DB câu nào**
-(cả 3 kịch bản dưới đây đều 0 câu `select`). Nó nhìn cái cờ trên object là biết.
-
-Kết quả thật, đã chạy:
-
-| Sau `em.clear()` | SQL sinh ra | Trạng thái sau `flush` |
-|---|---|---|
-| `persist` → `flush` (chưa sửa gì) | không có gì | `DETACHED` — **sửa sau đó cũng vô hiệu** |
-| sửa → `persist` → `flush` | `update` `[1 row affected]` | `DETACHED` — ghi đúng **một phát** rồi buông |
-| `merge` → sửa → `flush` | `update` `[1 row affected]` | `MANAGED` — quản lại thật sự |
-
-> **`persist` trên detached là phát một lần** — ghi cái diff đang có tại đúng thời điểm `flush`
-> rồi thả tay, không đưa object trở lại `identityMap`. **`merge` mới là gắn lại.**
-
-Dòng 1 là bug bài 2: không exception, log sạch, DB không đổi.
-
-**Còn detached kiểu khác thì `persist` lại INSERT:**
-
-| Vào detached bằng | Row trong DB | `persist()` + `flush()` |
-|---|---|---|
-| `em.clear()` | vẫn còn | không bao giờ insert (bảng trên) |
-| `remove()` + `flush()` | đã bị xoá | `insert` **kèm cột `id`** (id do `u.id` quyết, không phải DB) |
-
-Vì `remove()` + `flush()` đã gỡ cờ "tao từ DB ra" khỏi object → nó thành `NEW` trở lại.
-
-### `merge()`
-
-```ts
-em.clear();
-em.merge(u);              // -> MANAGED ngay. 0 câu SQL.
-u.name = 'Doi sau merge';
-await em.flush();         // -> update ... [1 row affected]
-```
-
-`merge` nói *"object này tao đảm bảo đã có row trong DB"* — và `em` **tin luôn, không kiểm tra**.
-Nạp thẳng vào `identityMap` + `original`.
-
-→ Mặt trái: merge một object mà row đã bị xoá thật thì `flush` vẫn sinh `update`, và log ghi
-`[0 rows affected]`. Không exception, không cảnh báo. **Câu lệnh rơi vào khoảng không.**
-
-> Khi debug MikroORM, `[N rows affected]` ở cuối dòng log quan trọng ngang câu SQL.
+| 1 | [Identity Map](src/bai/01-identity-map/) | Một `em`, một dòng DB → **duy nhất một object** trong RAM. Dữ liệu trong RAM luôn thắng dữ liệu vừa lấy từ DB. |
+| 2 | [Unit of Work](src/bai/02-unit-of-work/) | `flush()` = so object với ảnh chụp lúc load. `em.clear()` không reset giá trị — nó cắt quan hệ quản lý. Bug **âm thầm**. |
+| 3 | [`em.fork()` và `RequestContext`](src/bai/03-fork-va-request-context/) | Hai request chung một `em` = rò dữ liệu chéo. `RequestContext` = `fork()` tự động. `allowGlobalContext: true` là bẫy. |
+| 4 | [4 trạng thái của entity](src/bai/04-trang-thai-entity/) | `persist`/`remove`/`merge` chỉ ghi vào sổ, `flush` mới đi làm. Ảnh chụp gốc nằm **trên object**, sống sót qua `clear()`. |
+| 5 | [Đọc hiểu `orm.ts`](src/bai/05-doc-hieu-orm-ts/) | MikroORM **không tự tạo bảng**. `metadataProvider` cần đủ 3 mảnh (`emitDecoratorMetadata` + `reflect-metadata` + config). `em.clear()` sau seed là thứ khiến bài 1 nhìn thấy được câu `select`. |
 
 ---
 
@@ -373,7 +195,8 @@ Bản `@mikro-orm/decorators/es` là decorator theo chuẩn ES mới, chưa dùn
 
 ## Dành cho Claude ở phiên sau
 
-Đọc file này là đủ để dạy tiếp, không cần hỏi lại từ đầu. Tóm tắt bối cảnh:
+Đọc file này là đủ để biết đang ở đâu. Chi tiết từng bài nằm trong `src/bai/NN-*/README.md`,
+chỉ mở ra khi cần. Tóm tắt bối cảnh:
 
 - **Người học:** fullstack dev, ~3 năm Next.js, ~1 năm NestJS. Đang dùng MikroORM + NestJS
   ở công ty nhưng chưa chuyên sâu. Không có khoá YouTube nào để theo.
@@ -385,6 +208,12 @@ Bản `@mikro-orm/decorators/es` là decorator theo chuẩn ES mới, chưa dùn
   chấm bài rồi mới sang bài kế.
 - **Không làm:** đừng đưa nhiều thí nghiệm trong một file, đừng giải thích lý thuyết dài
   trước khi họ chạy code.
-- **Tiếp theo:** bài 5 — đọc hiểu `src/orm.ts`, file đã bỏ qua từ bài 1.
+- **Rút kinh nghiệm từ bài 4:** nhồi 5 khái niệm + 2 bài tập vào một file là tắc ngay. Tách
+  thành 4A / 4B / 4C, mỗi file **một việc**, và chèn mốc `console.log('--- SAP GOI x() ---')`
+  quanh lời gọi cần soi — để nhìn ra câu SQL rơi vào giữa hai mốc nào. Nhịp này chạy được.
+- **Không khẳng định hành vi ORM khi chưa chạy thử.** Bài 4 đã viết sai một bảng vào README vì
+  suy luận thay vì chạy. Chạy trước, viết sau.
+- **Tiếp theo:** bài 6 — ManyToOne / OneToMany. Hết Chương 1, bắt đầu Chương 2.
+  Cần thêm entity mới (vd `Post`) vào `src/entities/`.
 - **Còn treo:** project ở công ty đang chạy MikroORM version mấy? (`npm ls @mikro-orm/core`)
   Nếu là v6 thì phần `import` và cấu hình sẽ khác sandbox này.
