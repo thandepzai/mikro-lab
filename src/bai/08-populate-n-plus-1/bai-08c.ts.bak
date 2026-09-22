@@ -1,0 +1,14 @@
+import { run } from "./orm";
+import { Post } from "./entities/Post";
+
+// ===== BAI 8A — Tu tay tao bug N+1 =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+  const posts = await em.find(Post, {}, { populate: ["author"] });
+  console.log("--- DA LOAD", posts.length, "POST ---");
+
+  for (const p of posts) {
+    console.log(p.title, "->", p.author.$.name);
+  }
+});

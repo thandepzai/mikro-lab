@@ -16,7 +16,10 @@ npm run dev
 ```
 
 SQLite in-memory — không cần Docker, không cần Postgres, không cần config gì.
-Trong DB luôn có sẵn 1 dòng: `id = 1, name = 'Than', email = 'than@example.com'`.
+Trong DB luôn có sẵn:
+- `user`: `id = 1, name = 'Than', email = 'than@example.com'`
+- `post`: `id = 1, title = 'Bai dau tien', author_id = 1` *(thêm từ bài 6)*
+- Từ bài 8 thêm: user `2 An`, `3 Binh`; post `2 'Bai cua An'` (author 2), `3 'Bai cua Binh'` (author 3)
 
 > **Node 20 → segfault.** `@mikro-orm/sqlite` v7 ghim `better-sqlite3@13`, bản này yêu cầu Node >= 22.
 > Chạy trên Node 20 thì process chết ngay (exit 139) mà không có message. Repo đã hạ xuống bằng
@@ -137,11 +140,11 @@ Nó chỉ nhìn xem object đang nằm trong cái nào ở trên rồi đặt t�
 
 ### Chương 2 — Quan hệ và truy vấn
 
-- [ ] **6. ManyToOne / OneToMany** — cách MikroORM lưu quan hệ trong RAM
-- [ ] **7. `Ref` / `Reference`** — entity chưa load nhưng vẫn dùng được
-- [ ] **8. `populate` và N+1** — tự tay tạo ra bug N+1 rồi tự sửa
-- [ ] **9. Loading strategy** — `select-in` vs `joined`, khi nào chọn cái nào
-- [ ] **10. QueryBuilder** — khi nào `em.find` không đủ, và cái giá phải trả
+- [x] **6. ManyToOne / OneToMany** — cách MikroORM lưu quan hệ trong RAM → [ghi chú](src/bai/06-many-to-one/)
+- [x] **7. `Ref` / `Reference`** — entity chưa load nhưng vẫn dùng được → [ghi chú](src/bai/07-ref/)
+- [x] **8. `populate` và N+1** — tự tay tạo ra bug N+1 rồi tự sửa → [ghi chú](src/bai/08-populate-n-plus-1/)
+- [x] **9. Loading strategy** — `select-in` vs `joined`, khi nào chọn cái nào → [ghi chú](src/bai/09-loading-strategy/)
+- [x] **10. QueryBuilder** — khi nào `em.find` không đủ, và cái giá phải trả → [ghi chú](src/bai/10-query-builder/)
 
 ### Chương 3 — Ghi dữ liệu cho đúng
 
@@ -172,6 +175,11 @@ Mỗi bài một thư mục trong `src/bai/`, gồm `README.md` (ghi chú + đá
 | 3 | [`em.fork()` và `RequestContext`](src/bai/03-fork-va-request-context/) | Hai request chung một `em` = rò dữ liệu chéo. `RequestContext` = `fork()` tự động. `allowGlobalContext: true` là bẫy. |
 | 4 | [4 trạng thái của entity](src/bai/04-trang-thai-entity/) | `persist`/`remove`/`merge` chỉ ghi vào sổ, `flush` mới đi làm. Ảnh chụp gốc nằm **trên object**, sống sót qua `clear()`. |
 | 5 | [Đọc hiểu `orm.ts`](src/bai/05-doc-hieu-orm-ts/) | MikroORM **không tự tạo bảng**. `metadataProvider` cần đủ 3 mảnh (`emitDecoratorMetadata` + `reflect-metadata` + config). `em.clear()` sau seed là thứ khiến bài 1 nhìn thấy được câu `select`. |
+| 6 | [ManyToOne / OneToMany](src/bai/06-many-to-one/) | DB lưu số, RAM lưu object. `post.author` = **vỏ** chỉ có id, nằm trong Identity Map, load xong thì đổ vào chính vỏ đó. `user.posts` = **hộp khoá**, đụng vào là ném lỗi, không trả `0` cho êm. |
+| 7 | [`Ref` / `Reference`](src/bai/07-ref/) | `ref: true` → TS chặn `post.author.name` ngay lúc biên dịch. Lấy dữ liệu bằng `load()`; chắc đã load thì `getEntity()` (ném lỗi nếu chưa), tránh `unwrap()` (âm thầm `undefined`). |
+| 8 | [`populate` và N+1](src/bai/08-populate-n-plus-1/) | `load()` trong `for` = 1 + N câu (1000 post → 1001). `populate: ['author']` → 1 câu `join`. Có populate thì TS mới cho `.$`. Dấu hiệu: `await` quan hệ bên trong vòng lặp. |
+| 9 | [Loading strategy](src/bai/09-loading-strategy/) | `joined` = 1 câu nhưng bên "một" bị lặp mỗi dòng (Than 5 post → 5 dòng mang tên Than). `select-in` = 2 câu `where id in (...)`, không lặp. Chiều một → `joined`; chiều nhiều → `select-in`. |
+| 10 | [QueryBuilder](src/bai/10-query-builder/) | Dùng cho `count` / `group by`. Hàm cuối quyết định: `execute()` = object trơn, **ngoài sổ**, sửa rồi flush bị bỏ qua âm thầm; `getResultList()` = entity thật, flush ra `update`. `raw()` = nguyên văn, cấm nhét input người dùng. |
 
 ---
 
@@ -213,7 +221,7 @@ chỉ mở ra khi cần. Tóm tắt bối cảnh:
   quanh lời gọi cần soi — để nhìn ra câu SQL rơi vào giữa hai mốc nào. Nhịp này chạy được.
 - **Không khẳng định hành vi ORM khi chưa chạy thử.** Bài 4 đã viết sai một bảng vào README vì
   suy luận thay vì chạy. Chạy trước, viết sau.
-- **Tiếp theo:** bài 6 — ManyToOne / OneToMany. Hết Chương 1, bắt đầu Chương 2.
-  Cần thêm entity mới (vd `Post`) vào `src/entities/`.
+- **Tiếp theo:** bài 11 — Transaction. Hết Chương 2, bắt đầu Chương 3. Dạy chậm, phần nội bộ chỉ làm phụ lục.
+- **Sandbox đổi từ bài 10:** `orm.ts` truyền `em` kiểu `EntityManager` của `@mikro-orm/sqlite` (ép kiểu) để có `createQueryBuilder`. Seed có 3 user, 3 post (xem phần Chạy).
 - **Còn treo:** project ở công ty đang chạy MikroORM version mấy? (`npm ls @mikro-orm/core`)
   Nếu là v6 thì phần `import` và cấu hình sẽ khác sandbox này.

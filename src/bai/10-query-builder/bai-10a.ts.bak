@@ -1,0 +1,31 @@
+import { run } from './orm';
+import { Post } from './entities/Post';
+import { User } from './entities/User';
+import { raw } from '@mikro-orm/sqlite';
+
+// ===== BAI 10A — QueryBuilder: cau hoi ma em.find khong tra loi duoc =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+
+  // Cho Than viet them 2 bai -> Than 3 bai, An 1, Binh 1
+  em.create(Post, { title: 'Bai 2 cua Than', author: 1 });
+  em.create(Post, { title: 'Bai 3 cua Than', author: 1 });
+  await em.flush();
+  em.clear();
+
+  console.log('--- SAP CHAY QUERY BUILDER ---');
+  const ketQua = await em.createQueryBuilder(User, 'u')
+    .select(['u.name', raw('count(p.id) as so_bai')])
+    .leftJoin('u.posts', 'p')
+    .groupBy('u.id')
+    .execute();
+  console.log('--- XONG ---');
+
+  console.log(ketQua);
+
+});
+
+/* KET QUA: 1 cau select ... count(p.id) ... left join post ... group by u.id  [3 results]
+   [ { name: 'Than', so_bai: 3 }, { name: 'An', so_bai: 1 }, { name: 'Binh', so_bai: 1 } ]
+   -> mang object JS tron, dung cac cot minh select, khong phai entity User. */

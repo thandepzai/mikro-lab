@@ -1,4 +1,6 @@
-import { Entity, PrimaryKey, Property } from '@mikro-orm/decorators/legacy';
+import { Collection } from '@mikro-orm/core';
+import { Entity, PrimaryKey, Property, OneToMany } from '@mikro-orm/decorators/legacy';
+import { Post } from './Post';
 
 @Entity()
 export class User {
@@ -11,5 +13,8 @@ export class User {
 
   @Property()
   email!: string;
+
+  @OneToMany(() => Post, post => post.author)
+  posts = new Collection<Post>(this);
 
 }

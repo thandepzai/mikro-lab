@@ -1,0 +1,21 @@
+import { run } from "./orm";
+import { Post } from "./entities/Post";
+
+// ===== BAI 8A — Tu tay tao bug N+1 =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+  const posts = await em.find(Post, {}, { populate: ["author"] });
+  console.log("--- DA LOAD", posts.length, "POST ---");
+
+  for (const p of posts) {
+    const a = await p.author.load();
+    console.log(p.title, "->", a!.name);
+  }
+});
+
+/* KET QUA:
+   8A (khong populate): select post + 3 x select user where id = ? -> 4 cau = N+1. 1000 post -> 1001 cau.
+   8B (populate: ['author']): 1 cau duy nhat:
+     select p0.*, a1.id, a1.name, a1.email from post p0 inner join user a1 on p0.author_id = a1.id
+   load() trong vong for -> 0 SQL vi vo da day. */

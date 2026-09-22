@@ -1,0 +1,24 @@
+import { run } from './orm';
+import { Post } from './entities/Post';
+
+// ===== BAI 9A — select-in: tach lam 2 cau =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+
+  const posts = await em.find(Post, {}, {
+    populate: ['author'],
+    strategy: 'select-in',
+  });
+  console.log('--- DA LOAD', posts.length, 'POST ---');
+
+  for (const p of posts) {
+    console.log(p.title, '->', p.author.$.name);
+  }
+
+});
+
+/* KET QUA: 2 cau.
+   select p0.* from post
+   select u0.* from user where id in (1, 2, 3)   <- id lay tu cac cai vo (author_id), khong can join
+   1000 post van chi 2 cau. */

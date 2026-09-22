@@ -1,0 +1,21 @@
+import { run } from "./orm";
+import { Post } from "./entities/Post";
+
+// ===== BAI 7B — Mo cai vo bang load() =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+  const post = await em.findOne(Post, 1);
+
+  console.log("--- SAP GOI author.load() ---");
+  const author = await post!.author.load();
+  console.log("--- GOI XONG ---");
+
+  console.log("author.name =", author!.name);
+
+  console.log("--- SAP GOI author.load() LAN 2 ---");
+  await post!.author.load();
+  console.log("--- GOI XONG LAN 2 ---");
+
+  console.log("post.author.name =", post!.author.name);
+});

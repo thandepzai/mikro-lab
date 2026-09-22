@@ -1,0 +1,22 @@
+import { run } from './orm';
+import { User } from './entities/User';
+
+// ===== BAI 6D — Mo khoa Collection bang load() =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+
+  const u = await em.findOne(User, 1);
+  console.log('--- SAP GOI posts.load() ---');
+  await u!.posts.load();
+  console.log('--- GOI XONG ---');
+
+  console.log('so bai viet =', u!.posts.length);
+  console.log('tieu de     =', u!.posts[0].title);
+
+});
+
+/* KET QUA:
+   select p0.* from post as p0 where p0.author_id in (1)
+   so bai viet = 1 | tieu de = Bai dau tien
+   Dung "in (1)" chu khong phai "= 1": de mot cau gom duoc nhieu user -> in (1, 2, 3) (bai 8-9). */

@@ -1,0 +1,24 @@
+import { run } from './orm';
+import { Post } from './entities/Post';
+import { User } from './entities/User';
+
+// ===== BAI 6B — "Vo rong" author va Identity Map =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+
+  const post = await em.findOne(Post, 1);
+  console.log('truoc: author.name =', post!.author.name);
+
+  console.log('--- SAP GOI findOne(User, 1) ---');
+  const u = await em.findOne(User, 1);
+  console.log('--- GOI XONG ---');
+
+  console.log('sau:   author.name =', post!.author.name);
+  console.log('post.author === u ?', post!.author === u);
+
+});
+
+/* KET QUA: findOne(User,1) VAN select (vo trong map chua co du lieu),
+   du lieu duoc DO VAO CHINH CAI VO -> author.name = 'Than', post.author === u -> true.
+   Goi findOne(User,1) lan 2 -> 0 select (vo da day). */

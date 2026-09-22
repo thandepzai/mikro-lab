@@ -1,0 +1,52 @@
+import { run, trangThai } from './orm';
+import { User } from './entities/User';
+
+// ===== ON TAP CHUONG 1 =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em, orm) => {
+
+  console.log('=== TH1 ===');
+  const u = await em.findOne(User, 1);
+  u!.name = 'Ten moi';
+  const t1 = await em.findOne(User, { name: 'Than' });
+  console.log('TH1 >> tim thay?', !!t1, '| name =', t1?.name, '| t1 === u ?', t1 === u);
+
+  em.clear();
+
+  console.log('=== TH2 ===');
+  const v = await em.findOne(User, 1);
+  em.clear();
+  console.log('TH2 >> trang thai truoc persist:', trangThai(em, v));
+  em.persist(v!);
+  console.log('TH2 >> trang thai sau persist  :', trangThai(em, v));
+  console.log('--- SAP FLUSH ---');
+  await em.flush();
+  console.log('--- FLUSH XONG ---');
+
+  console.log('=== TH3 ===');
+  const em1 = orm.em.fork();
+  const em2 = orm.em.fork();
+  const a = await em1.findOne(User, 1);
+  const b = await em2.findOne(User, 1);
+  console.log('TH3 >> a === b ?', a === b);
+
+  console.log('=== TH4 ===');
+  const em3 = orm.em.fork();
+  const w = await em3.findOne(User, 1);
+  em3.remove(w!);
+  console.log('TH4 >> trang thai:', trangThai(em3, w));
+  console.log('--- SAP FLUSH (TH4) ---');
+  await em3.flush();
+  console.log('--- FLUSH XONG (TH4) ---');
+
+});
+
+/* KET QUA DA CHAY (22/09/2026):
+TH1 >> tim thay? true | name = Ten moi | t1 === u ? true
+   -> SQL van tim theo 'Than' trong DB, nhung tra ve object dang giu trong RAM (Identity Map thang).
+TH2 >> DETACHED -> sau persist: 'NEW (cho flush)' nhung flush KHONG sinh SQL nao
+   -> anh chup goc nam tren object, ORM biet no khong moi, khong INSERT.
+TH3 >> a === b ? false  -> 2 fork = 2 identity map = 2 object.
+TH4 >> REMOVED -> flush: begin / delete ... / commit
+*/

@@ -1,0 +1,30 @@
+import { run } from "./orm";
+import { Post } from "./entities/Post";
+
+// ===== BAI 7B — Mo cai vo bang load() =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+  const post = await em.findOne(Post, 1);
+
+  console.log("--- SAP GOI author.load() ---");
+  const author = await post!.author.load();
+  console.log("--- GOI XONG ---");
+
+  console.log("author.name =", author!.name);
+
+  console.log("--- SAP GOI author.load() LAN 2 ---");
+  await post!.author.load();
+  console.log("--- GOI XONG LAN 2 ---");
+
+  console.log("post.author.name =", post!.author.name);
+});
+
+/* KET QUA: load lan 1 -> select user where id = 1 (vo biet san id, khong join). Lan 2 -> 0 SQL.
+   Sau load, post.author.name VAN bi TS chan: TS chi doc kieu khai bao trong class (Ref<User>),
+   khong biet luc chay da load hay chua.
+   Cach lay du lieu (da chay thu):
+   - const a = await post.author.load(); a!.name       -> dung gia tri tra ve
+   - post.author.getEntity().name  -> chua load thi NEM LOI 'Reference<User> 1 not initialized' (an toan)
+   - post.author.unwrap().name     -> chua load thi ra undefined AM THAM (tranh)
+   - findOne(Post, 1, { populate: ['author'] }) -> p.author.$.name  (TS biet da load; bai 8) */

@@ -1,0 +1,19 @@
+import { run } from './orm';
+import { User } from './entities/User';
+
+// ===== BAI 6C — OneToMany: user.posts =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+
+  const u = await em.findOne(User, 1);
+  console.log('--- DA LOAD USER ---');
+
+  console.log('so bai viet =', u!.posts.length);
+
+});
+
+/* KET QUA: load user chi select bang user (bang user khong co cot nao ve post).
+   u.posts.length -> Error: Collection<Post> of entity User[1] not initialized
+   Vi sao nem loi ma khong tra 0: tra 0 = noi doi am tham ("user nay khong co bai nao"),
+   giong bug am tham cua em.clear() o bai 2. Nem loi = bug on ao, thay ngay. */

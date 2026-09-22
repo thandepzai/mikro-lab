@@ -1,0 +1,19 @@
+import { run } from './orm';
+import { Post } from './entities/Post';
+
+// ===== BAI 6A — ManyToOne: DB luu so, RAM luu object =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+
+  const post = await em.findOne(Post, 1);
+  console.log('--- DA LOAD POST ---');
+
+  console.log('author.id   =', post!.author.id);
+  console.log('author.name =', post!.author.name);
+
+});
+
+/* KET QUA: chi 1 cau select tren bang post, khong dung bang user.
+   author.id = 1, author.name = undefined.
+   Bang post chi luu author_id = 1 -> ORM tao mot "vo" User chi co id (reference, chua load). */

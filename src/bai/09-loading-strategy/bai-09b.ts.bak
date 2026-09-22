@@ -1,0 +1,27 @@
+import { run } from './orm';
+import { User } from './entities/User';
+import { Post } from './entities/Post';
+
+// ===== BAI 9B — joined lap lai du lieu user =====
+// DOAN KET QUA TRUOC KHI CHAY. Nhin vao "[... N results]" o cuoi moi cau SQL.
+
+run(async (em) => {
+
+  // Cho Than viet them 4 bai -> Than co 5 bai
+  for (let i = 2; i <= 5; i++) em.create(Post, { title: 'Bai ' + i + ' cua Than', author: 1 });
+  await em.flush();
+  em.clear();
+
+  console.log('=== JOINED ===');
+  await em.findOne(User, 1, { populate: ['posts'], strategy: 'joined' });
+  em.clear();
+
+  console.log('=== SELECT-IN ===');
+  await em.findOne(User, 1, { populate: ['posts'], strategy: 'select-in' });
+
+});
+
+/* KET QUA (Than co 5 post):
+   JOINED   : 1 cau, left join post -> [5 results]. Moi dong mang lai name + email cua Than -> lap 5 lan.
+   SELECT-IN: select user where id = 1 -> [1 result]; select post where author_id in (1) -> [5 results].
+              'Than' chi xuat hien 1 lan. */

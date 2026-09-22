@@ -1,0 +1,19 @@
+import { run } from './orm';
+import { Post } from './entities/Post';
+
+// ===== BAI 7A — Ref: bat TypeScript chan cai vo =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+
+  const post = await em.findOne(Post, 1);
+
+  console.log('author.id   =', post!.author.id);
+  console.log('author.name =', post!.author.name);
+
+});
+
+/* KET QUA: tsc bao loi, node khong chay:
+   error TS2339: Property 'name' does not exist on type '{ id: number; } & Reference<User & object>'.
+   -> Kieu '{ id: number }' chinh la "cai vo" cua bai 6A. Ref bien bug am tham (undefined luc chay)
+      thanh bug on ao luc bien dich. */

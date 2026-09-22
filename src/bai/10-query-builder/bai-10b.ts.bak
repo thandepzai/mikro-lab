@@ -1,0 +1,37 @@
+import { run } from './orm';
+import { Post } from './entities/Post';
+import { User } from './entities/User';
+import { raw } from '@mikro-orm/sqlite';
+
+// ===== BAI 10B — Cai gia cua QueryBuilder =====
+// DOAN KET QUA TRUOC KHI CHAY.
+
+run(async (em) => {
+
+  // Cho Than viet them 2 bai -> Than 3 bai, An 1, Binh 1
+  em.create(Post, { title: 'Bai 2 cua Than', author: 1 });
+  em.create(Post, { title: 'Bai 3 cua Than', author: 1 });
+  await em.flush();
+  em.clear();
+
+  console.log('--- SAP CHAY QUERY BUILDER ---');
+  const ketQua = await em.createQueryBuilder(User, 'u')
+    .select(['u.name', raw('count(p.id) as so_bai')])
+    .leftJoin('u.posts', 'p')
+    .groupBy('u.id')
+    .execute();
+  console.log('--- XONG ---');
+
+  const dong = ketQua[0] as any;
+  console.log('dong la User?', dong instanceof User);
+
+  dong.name = 'Ten moi';
+  console.log('--- SAP FLUSH ---');
+  await em.flush();
+  console.log('--- FLUSH XONG ---');
+
+});
+
+/* KET QUA: dong la User? false. Flush: KHONG co SQL nao (khong begin).
+   execute() tra ve object tron -> khong phai entity, khong nam trong so (Identity Map),
+   khong co anh chup goc -> flush khong co gi de so. Sua xong bi bo qua AM THAM. */

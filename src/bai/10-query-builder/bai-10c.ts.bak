@@ -19,3 +19,6 @@ run(async (em) => {
   console.log('--- FLUSH XONG ---');
 
 });
+
+/* KET QUA: u la User? true. Flush: begin / update user set name = 'Ten moi' where id = 1 / commit.
+   getResultList() tra ve entity that -> vao so, co anh chup goc -> flush thay thay doi. */
