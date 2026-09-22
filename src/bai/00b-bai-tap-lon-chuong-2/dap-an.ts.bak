@@ -1,0 +1,40 @@
+import { run } from './orm';
+import { Post } from './entities/Post';
+import { Comment } from './entities/Comment';
+import { raw } from '@mikro-orm/sqlite';
+
+// ===== BAI TAP LON — DAP AN =====
+
+run(async (em) => {
+
+  console.log('===== NHIEM VU 1: them comment =====');
+  // Dua so id -> MikroORM tu tao "cai vo" Post (bai 6A) -> khong can select
+  em.create(Comment, { title: 'Hay qua', post: 1 });
+  em.create(Comment, { title: 'Cam on tac gia', post: 1 });
+  em.create(Comment, { title: 'Doc xong roi', post: 2 });
+  await em.flush();                       // 1 begin, 1 insert gom 3 dong, 1 commit
+  em.clear();
+
+  console.log('===== NHIEM VU 2: trang danh sach bai viet =====');
+  // Mo ca 2 quan he: author (vo) + comments (hop khoa)
+  const posts = await em.find(Post, {}, { populate: ['author', 'comments'] });
+  for (const p of posts) {
+    console.log(p.title, '|', p.author.$.name, '|', p.comments.length, 'comment');
+  }
+  em.clear();
+
+  console.log('===== NHIEM VU 3: doi ten tac gia =====');
+  const post = await em.findOneOrFail(Post, { title: 'Bai cua An' }, { populate: ['author'] });
+  post.author.$.name = 'An Nguyen';       // user nam trong so -> flush tu so voi anh chup (bai 2)
+  await em.flush();
+  em.clear();
+
+  console.log('===== NHIEM VU 4: thong ke =====');
+  const thongKe = await em.createQueryBuilder(Post, 'p')
+    .select(['p.title', raw('count(c.id) as so_comment')])
+    .leftJoin('p.comments', 'c')          // left join: bai 0 comment van co mat
+    .groupBy('p.id')
+    .execute();                           // object tron, chi can doc -> execute la du
+  console.log(thongKe);
+
+});

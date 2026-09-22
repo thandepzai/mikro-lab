@@ -1,0 +1,91 @@
+import { run } from "./orm";
+import { Post } from "./entities/Post";
+import { User } from "./entities/User";
+import { Comment } from "./entities/Comment";
+import { raw } from "@mikro-orm/sqlite";
+
+// ================================================================
+//  BAI TAP LON — ON TAP CHUONG 1 + 2: "Trang blog mini"
+//  Lam TUNG nhiem vu mot. Xong nhiem vu nao -> npm run dev -> gui log cho Claude cham.
+//  Du lieu co san: 3 user (Than, An, Binh), 3 post:
+//    1 'Bai dau tien' (Than) | 2 'Bai cua An' (An) | 3 'Bai cua Binh' (Binh)
+// ================================================================
+
+run(async (em) => {
+  // ----------------------------------------------------------------
+  console.log("===== NHIEM VU 1: them comment =====");
+  // Tao 3 comment:
+  //   'Hay qua'        -> post 1
+  //   'Cam on tac gia' -> post 1
+  //   'Doc xong roi'   -> post 2
+  // YEU CAU: chi 1 cap begin/commit. Ca 3 insert nam gon trong 1 transaction.
+  // (Bai 4: persist/create chi ghi so, flush moi di lam)
+
+  // TODO
+  const comment1 = new Comment();
+  comment1.title = "Hay qua";
+  comment1.post = await em.findOneOrFail(Post, { id: 1 });
+  const comment2 = new Comment();
+  comment2.title = "Cam on tac gia";
+  comment2.post = await em.findOneOrFail(Post, { id: 1 });
+  const comment3 = new Comment();
+  comment3.title = "Doc xong roi";
+  comment3.post = await em.findOneOrFail(Post, { id: 2 });
+
+  em.persist([comment1, comment2, comment3]);
+  await em.flush();
+
+  em.clear();
+
+  // ----------------------------------------------------------------
+  console.log("===== NHIEM VU 2: trang danh sach bai viet =====");
+  // In ra moi post 1 dong:   <title> | <ten tac gia> | <so comment> comment
+  // YEU CAU:
+  //   - TOI DA 2 cau select, du co 1000 post (bai 8, 9)
+  //   - Lay ten tac gia bang .$ (khong await, khong load) (bai 7, 8)
+
+  // TODO
+  const posts = await em.find(
+    Post,
+    { comments: { $exists: true } },
+    { populate: ["author"], strategy: "select-in" },
+  );
+  console.log("🚀 ~ posts:", posts);
+
+  em.clear();
+
+  // ----------------------------------------------------------------
+  console.log("===== NHIEM VU 3: doi ten tac gia =====");
+  // Tim bai co title 'Bai cua An', doi ten TAC GIA cua no thanh 'An Nguyen'.
+  // YEU CAU:
+  //   - KHONG goi em.persist (bai 2)
+  //   - Log phai co: update `user` set `name` = 'An Nguyen' where `id` = 2
+
+  // TODO
+
+  const user = await em.find(
+    Post,
+    { title: "Bai cua An" },
+    { populate: ["author"] },
+  );
+  if (user.length > 0) {
+    user[0].author.$.name = "An Nguyen";
+    await em.flush();
+  }
+  em.clear();
+
+  // ----------------------------------------------------------------
+  console.log("===== NHIEM VU 4: thong ke =====");
+  // In ra mang: [{ title: 'Bai dau tien', so_comment: 2 }, ...] ca 3 bai
+  // YEU CAU: 1 cau SQL duy nhat, KHONG keo comment ve RAM (bai 10)
+
+  // TODO
+  const ketQua = await em
+    .createQueryBuilder(Post, "p")
+    .select(["p.title", raw("count(c.id) as so_comment")])
+    .leftJoin("p.comments", "c")
+    .groupBy("p.id")
+    .execute();
+  console.log("🚀 ~ ketQua:", ketQua);
+  console.log("--- XONG ---");
+});
