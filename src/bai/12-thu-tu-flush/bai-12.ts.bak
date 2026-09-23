@@ -1,0 +1,35 @@
+import { run } from "./orm";
+import { Post } from "./entities/Post";
+import { User } from "./entities/User";
+
+run(async (em) => {
+  console.log("===== THI NGHIEM 1: INSERT LONG NHAU =====");
+  em.create(Post, {
+    title: "Bai co tac gia moi",
+    author: { name: "Tac Gia Moi", email: "tacgia@example.com" },
+  } as any);
+  await em.flush();
+});
+
+// ===== KET QUA THI NGHIEM 1 =====
+// Code viet Post truoc, User (author) long ben trong.
+// Nhung insert into "user" CHAY TRUOC insert into "post".
+// Ly do: post.author_id la khoa ngoai tro toi user.id, user chua co id
+// cho toi khi duoc insert. MikroORM tu dung "do thi phu thuoc" giua
+// cac entity dang cho flush, roi sap: entity bi tham chieu insert truoc,
+// entity tham chieu toi no insert sau -- khong quan tam thu tu goi
+// em.create() trong code.
+
+// ===== THI NGHIEM 2: INSERT + UPDATE + DELETE CUNG FLUSH =====
+// const userToUpdate = await em.findOneOrFail(User, { name: "Than" });
+// const postToDelete = await em.findOneOrFail(Post, { title: "Bai cua Binh" });
+// em.create(Post, { title: "Bai insert moi", author: userToUpdate });
+// userToUpdate.name = "Than Cap Nhat";
+// em.remove(postToDelete);
+// await em.flush();
+//
+// KET QUA: log ra dung thu tu insert -> update -> delete, du code
+// goi create/sua property/remove theo thu tu nao trong file.
+// - insert truoc: dam bao du lieu moi can thiet da ton tai
+// - delete cuoi cung: tranh xoa mat thu ma insert/update khac trong
+//   cung flush con co the can toi

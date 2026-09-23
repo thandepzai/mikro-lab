@@ -1,0 +1,38 @@
+import { run } from "./orm";
+import { Comment } from "./entities/Comment";
+
+run(async (em) => {
+  await em.transactional(async (em) => {
+    console.log("===== BEN NGOAI: TAO COMMENT A =====");
+    em.create(Comment, { title: "Comment A", post: 1 });
+    await em.flush();
+
+    try {
+      await em.transactional(async (em) => {
+        console.log("===== BEN TRONG: TAO COMMENT B =====");
+        em.create(Comment, { title: "Comment B", post: 1 });
+        await em.flush();
+
+        throw new Error("loi o savepoint");
+      });
+    } catch (err) {
+      console.log("Da bat loi savepoint:", (err as Error).message);
+    }
+
+    console.log("===== BEN NGOAI: TAO COMMENT C =====");
+    em.create(Comment, { title: "Comment C", post: 1 });
+    await em.flush();
+  });
+
+  em.clear();
+  const all = await em.find(Comment, {});
+  console.log("Cac comment con trong DB:", all.map((c) => c.title));
+});
+
+// ===== KET QUA DA CHAY =====
+// - 2 flush() roi nhau (khong wrap)        -> 2 cap begin...commit
+// - em.transactional() wrap 2 flush         -> 1 cap begin...commit
+// - loi ném giữa chừng trong transactional  -> rollback, mat het ca phan da flush truoc do
+// - transactional() long trong transactional khac -> KHONG mo begin moi, sinh `savepoint trx1`
+// - loi trong khoi long (savepoint)         -> chi rollback ve savepoint, mat Comment B
+//   Comment A (truoc) va Comment C (sau, cung khoi ngoai) VAN CON

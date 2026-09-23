@@ -27,11 +27,13 @@ export class Comment {
 
   @BeforeCreate()
   ganCreatedAt() {
+    console.log("--- HOOK @BeforeCreate CHAY ---");
     this.createdAt = new Date();
   }
 
   @BeforeUpdate()
   ganUpdatedAt() {
+    console.log("--- HOOK @BeforeUpdate CHAY ---");
     this.updatedAt = new Date();
   }
 }

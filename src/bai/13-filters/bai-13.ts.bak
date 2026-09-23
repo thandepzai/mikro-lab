@@ -1,0 +1,32 @@
+import { run } from "./orm";
+import { Post } from "./entities/Post";
+
+run(async (em) => {
+  console.log("===== THI NGHIEM 1: FILTER CO DINH =====");
+  em.addFilter({ name: "chiCuaThan", cond: { author: 1 }, entity: [Post] });
+  const coFilter = await em.find(Post, {});
+  console.log(coFilter.map((p) => p.title)); // co filter: 1 bai
+  const khongFilter = await em.find(Post, {}, { filters: false });
+  console.log(khongFilter.map((p) => p.title)); // filters:false: 3 bai
+});
+
+// ===== KET QUA THI NGHIEM 1 =====
+// em.addFilter({ name, cond, entity }) -- KHONG phai 3 tham so roi,
+// ma 1 object duy nhat. cond la dieu kien se tu dong cheng vao
+// WHERE cua MOI find/findOne cho entity do. default enabled = true
+// (khong can khai bao). Muon tat tam thoi: { filters: false }.
+
+// ===== THI NGHIEM 2: FILTER CO THAM SO DONG (dung cho multi-tenant) =====
+// em.addFilter({
+//   name: "theoTacGia",
+//   cond: (args) => ({ author: args.authorId }),
+//   entity: [Post],
+//   args: true,
+// });
+// await em.find(Post, {}, { filters: { theoTacGia: { authorId: 2 } } }); // chi bai cua An
+// await em.find(Post, {}, { filters: { theoTacGia: { authorId: 3 } } }); // chi bai cua Binh
+//
+// KET QUA: cung 1 filter dang ky 1 lan, nhung moi lan goi find truyen
+// authorId khac nhau -> ket qua loc khac nhau. Day la cach dung thuc
+// te cho multi-tenant: authorId (hay tenantId) lay tu request hien tai,
+// khong hardcode trong dinh nghia filter.

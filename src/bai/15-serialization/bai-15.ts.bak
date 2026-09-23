@@ -1,0 +1,16 @@
+import { run } from "./orm";
+import { User } from "./entities/User";
+
+run(async (em) => {
+  const u = await em.findOneOrFail(User, 1, { populate: ["posts"] });
+
+  console.log("===== JSON.stringify(user) CO populate posts =====");
+  console.log(JSON.stringify(u));
+});
+
+// ===== KET QUA DA CHAY =====
+// 15A: JSON.stringify(user) khong populate -> co email, KHONG co posts (chua load thi bo qua)
+// 15B: User.email = @Property({ hidden: true }) -> JSON mat email, nhung u.email VAN in ra gia tri
+//      (select van lay cot email; hidden chi tac dung luc toJSON)
+// 15C: populate posts -> JSON co posts, author trong moi post chi la so id
+//      (author chinh la object u -> in day du se vong lap vo han)

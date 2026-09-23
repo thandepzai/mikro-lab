@@ -148,11 +148,11 @@ Nó chỉ nhìn xem object đang nằm trong cái nào ở trên rồi đặt t�
 
 ### Chương 3 — Ghi dữ liệu cho đúng
 
-- [ ] **11. Transaction** — `em.transactional()`, `@Transactional()`, lồng nhau
-- [ ] **12. Thứ tự flush** — MikroORM tự sắp xếp insert/update/delete thế nào
-- [ ] **13. Filters** — soft delete và multi-tenant không cần lặp `where` khắp nơi
-- [ ] **14. Hooks & EventSubscriber** — `@BeforeCreate`, audit field tự động
-- [ ] **15. Serialization** — `wrap()`, `toJSON()`, ẩn field nhạy cảm khỏi response
+- [x] **11. Transaction** — `em.transactional()`, `@Transactional()`, lồng nhau → [ghi chú](src/bai/11-transaction/)
+- [x] **12. Thứ tự flush** — MikroORM tự sắp xếp insert/update/delete thế nào → [ghi chú](src/bai/12-thu-tu-flush/)
+- [x] **13. Filters** — soft delete và multi-tenant không cần lặp `where` khắp nơi → [ghi chú](src/bai/13-filters/)
+- [x] **14. Hooks & EventSubscriber** — `@BeforeCreate`, audit field tự động → [ghi chú](src/bai/14-hooks/) *(EventSubscriber để dành)*
+- [x] **15. Serialization** — `wrap()`, `toJSON()`, ẩn field nhạy cảm khỏi response → [ghi chú](src/bai/15-serialization/)
 
 ### Chương 4 — NestJS thật
 
@@ -180,6 +180,11 @@ Mỗi bài một thư mục trong `src/bai/`, gồm `README.md` (ghi chú + đá
 | 8 | [`populate` và N+1](src/bai/08-populate-n-plus-1/) | `load()` trong `for` = 1 + N câu (1000 post → 1001). `populate: ['author']` → 1 câu `join`. Có populate thì TS mới cho `.$`. Dấu hiệu: `await` quan hệ bên trong vòng lặp. |
 | 9 | [Loading strategy](src/bai/09-loading-strategy/) | `joined` = 1 câu nhưng bên "một" bị lặp mỗi dòng (Than 5 post → 5 dòng mang tên Than). `select-in` = 2 câu `where id in (...)`, không lặp. Chiều một → `joined`; chiều nhiều → `select-in`. |
 | 10 | [QueryBuilder](src/bai/10-query-builder/) | Dùng cho `count` / `group by`. Hàm cuối quyết định: `execute()` = object trơn, **ngoài sổ**, sửa rồi flush bị bỏ qua âm thầm; `getResultList()` = entity thật, flush ra `update`. `raw()` = nguyên văn, cấm nhét input người dùng. |
+| 11 | [Transaction](src/bai/11-transaction/) | `flush()` tự mở/đóng transaction riêng — nhiều `flush` rời nhau là nhiều giao dịch. `em.transactional()` gộp các `flush` bên trong thành **một** `begin...commit`; lỗi giữa chừng → `rollback` xoá sạch, kể cả phần đã "chạy" trước lỗi. Lồng `transactional()` không mở `begin` mới (DB không cho) — sinh `savepoint`; lỗi bên trong chỉ rollback tới savepoint đó, phần ngoài (trước/sau) không bị ảnh hưởng. |
+| 12 | [Thứ tự flush](src/bai/12-thu-tu-flush/) | SQL trong một `flush()` không chạy theo thứ tự viết code. Nhóm insert: entity bị tham chiếu (FK) insert trước entity tham chiếu tới nó, tự tính theo đồ thị phụ thuộc. Toàn cục: luôn **insert → update → delete**, dù code gọi xen kẽ thế nào. |
+| 13 | [Filters](src/bai/13-filters/) | `em.addFilter({ name, cond, entity })` — 1 object, tự chèn `WHERE` vào mọi `find`/`findOne` cho entity đó, mặc định luôn bật (`filters: false` để tắt tạm). `cond` dạng hàm + `args: true` → truyền tham số riêng mỗi lần gọi, dùng cho multi-tenant thật (tenantId lấy từ request, không hardcode). |
+| 14 | [Hooks](src/bai/14-hooks/) | `@BeforeCreate`/`@BeforeUpdate` chạy sau `begin`, trước khi dựng SQL → giá trị gán đi luôn vào `insert`/`update`. `createdAt` chỉ gán lúc tạo. **Bẫy:** `?` của TS không làm cột được NULL — phải `@Property({ nullable: true })`. |
+| 15 | [Serialization](src/bai/15-serialization/) | Quan hệ chưa load bị bỏ khỏi JSON. `hidden: true` chỉ giấu khỏi JSON — vẫn `select`, vẫn đọc được `u.email`. Populate `posts` thì `author` trong post chỉ in id (tránh vòng lặp). |
 
 ---
 
@@ -221,7 +226,7 @@ chỉ mở ra khi cần. Tóm tắt bối cảnh:
   quanh lời gọi cần soi — để nhìn ra câu SQL rơi vào giữa hai mốc nào. Nhịp này chạy được.
 - **Không khẳng định hành vi ORM khi chưa chạy thử.** Bài 4 đã viết sai một bảng vào README vì
   suy luận thay vì chạy. Chạy trước, viết sau.
-- **Tiếp theo:** bài 11 — Transaction. Hết Chương 2, bắt đầu Chương 3. Dạy chậm, phần nội bộ chỉ làm phụ lục.
+- **Tiếp theo:** bài 16 — `MikroOrmModule` (mở đầu Chương 4 NestJS). **Hết Chương 3.** Entity hiện tại: `Comment` có `createdAt`/`updatedAt` + 2 hook; `User.email` là `hidden: true`. EventSubscriber (bài 14) còn để dành.
 - **Sandbox đổi từ bài 10:** `orm.ts` truyền `em` kiểu `EntityManager` của `@mikro-orm/sqlite` (ép kiểu) để có `createQueryBuilder`. Seed có 3 user, 3 post (xem phần Chạy).
 - **Còn treo:** project ở công ty đang chạy MikroORM version mấy? (`npm ls @mikro-orm/core`)
   Nếu là v6 thì phần `import` và cấu hình sẽ khác sandbox này.

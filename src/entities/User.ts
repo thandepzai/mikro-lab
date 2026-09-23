@@ -11,7 +11,7 @@ export class User {
   @Property()
   name!: string;
 
-  @Property()
+  @Property({ hidden: true })
   email!: string;
 
   @OneToMany(() => Post, post => post.author)

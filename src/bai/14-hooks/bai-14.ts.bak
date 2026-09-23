@@ -1,0 +1,21 @@
+import { run } from "./orm";
+import { Comment } from "./entities/Comment";
+
+run(async (em) => {
+  console.log("===== TAO COMMENT =====");
+  const c = em.create(Comment, { title: "Comment co hook", post: 1 });
+  await em.flush();
+  console.log("Sau khi tao: createdAt =", c.createdAt, "| updatedAt =", c.updatedAt);
+
+  console.log("===== SUA TITLE (khong tao moi) =====");
+  c.title = "Comment da sua";
+  await em.flush();
+  console.log("Sau khi sua: createdAt =", c.createdAt, "| updatedAt =", c.updatedAt);
+});
+
+// ===== KET QUA DA CHAY =====
+// - Log: begin -> "--- HOOK @BeforeCreate CHAY ---" -> insert (da co createdAt) -> commit
+// - Sau tao: createdAt co gia tri, updatedAt = undefined
+// - Sau sua title: @BeforeUpdate chay, updatedAt co gia tri, createdAt KHONG doi
+// - BAY: updatedAt?: Date (dau ? cua TS) van bi loi
+//   "Value for Comment.updatedAt is required" -> phai them @Property({ nullable: true })
