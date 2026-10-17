@@ -16,6 +16,16 @@ export async function run(baiTap: BaiTap) {
     metadataProvider: ReflectMetadataProvider,
     debug: true,
   });
+  await taoBangVaSeed(orm);
+  const em = orm.em.fork();
+  console.log('\n---------- BAT DAU ----------\n');
+  // tsconfig dang dung moduleResolution "node" nen TS suy sai kieu em -> ep kieu tay
+  await baiTap(em as unknown as EntityManager, orm);
+  await orm.close(true);
+}
+
+// Tach ra tu bai 16: NestJS tu tao ORM (MikroOrmModule.forRoot), ta chi can tao bang + seed.
+export async function taoBangVaSeed(orm: { schema: { create(): Promise<void> }; em: any }) {
   await orm.schema.create();
   const em = orm.em.fork();
   const than = em.create(User, { name: 'Than', email: 'than@example.com' });
@@ -25,11 +35,6 @@ export async function run(baiTap: BaiTap) {
   em.create(Post, { title: 'Bai cua An', author: an });
   em.create(Post, { title: 'Bai cua Binh', author: binh });
   await em.flush();
-  em.clear();
-  console.log('\n---------- BAT DAU ----------\n');
-  // tsconfig dang dung moduleResolution "node" nen TS suy sai kieu em -> ep kieu tay
-  await baiTap(em as unknown as EntityManager, orm);
-  await orm.close(true);
 }
 
 export function trangThai(em: { getUnitOfWork(): unknown }, e: any): string {

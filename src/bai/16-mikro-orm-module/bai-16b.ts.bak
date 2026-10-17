@@ -1,0 +1,62 @@
+// BAI 16B — em ma Nest dua cho ban la em nao?
+import 'reflect-metadata';
+import { Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { MikroORM, EntityManager, SqliteDriver } from '@mikro-orm/sqlite';
+import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+import { User } from './entities/User';
+import { Post } from './entities/Post';
+import { Comment } from './entities/Comment';
+import { taoBangVaSeed } from './orm';
+
+@Module({
+  imports: [
+    MikroOrmModule.forRoot({
+      driver: SqliteDriver,
+      entities: [User, Post, Comment],
+      dbName: ':memory:',
+      metadataProvider: ReflectMetadataProvider,
+      debug: ['query'],
+      logger: console.log,
+    }),
+  ],
+})
+class AppModule {}
+
+async function main() {
+  const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error'] });
+  const orm = app.get(MikroORM);
+  await taoBangVaSeed(orm);
+  console.log('\n---------- BAT DAU ----------\n');
+
+  const em = app.get(EntityManager);          // xin Nest cai em
+
+  console.log('em === orm.em ?', (em as unknown) === orm.em);
+
+  console.log('--- SAP GOI findOne ---');
+  try {
+    const u = await em.findOne(User, 1);
+    console.log('u.name =', u?.name);
+  } catch (e: any) {
+    console.log('LOI:', e.message);
+  }
+  console.log('--- findOne XONG ---');
+
+  await app.close();
+}
+main();
+
+/* KET QUA (chay 07/10/2026)
+---------- BAT DAU ----------
+em === orm.em ? true
+--- SAP GOI findOne ---
+LOI: Using global EntityManager instance methods for context specific actions is disallowed.
+     If you need to work with the global instance's identity map, use `allowGlobalContext`
+     configuration option or `fork()` instead.
+--- findOne XONG ---
+
+=> Khong co cau select nao. em ma Nest dua (app.get / constructor inject) CHINH LA orm.em
+   toan cuc — ca app chi co mot cai. MikroORM cam dung thang cai em nay de doc/ghi
+   (bai 3: nhieu request chung mot em = ro du lieu cheo).
+*/

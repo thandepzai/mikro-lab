@@ -1,0 +1,67 @@
+import { run } from "./orm";
+import { Post } from "./entities/Post";
+import { User } from "./entities/User";
+import { Comment } from "./entities/Comment";
+
+run(async (em) => {
+  console.log("===== NHIEM VU 1: chuyen tac gia, loi giua chung =====");
+  try {
+    await em.transactional(async (em) => {
+      const post = await em.findOneOrFail(Post, { title: "Bai cua Binh" });
+      post.author = em.getReference(User, 2) as any;
+      em.create(Comment, { title: "Da chuyen tac gia", post });
+      await em.flush();
+      throw new Error("mat ket noi");
+    });
+  } catch (e) {
+    console.log("Bat loi:", (e as Error).message);
+  }
+  em.clear();
+  const p3 = await em.findOneOrFail(Post, { title: "Bai cua Binh" }, { populate: ["author"] });
+  console.log("Tac gia:", p3.author.$.name, "| so comment:", await em.count(Comment, {}));
+  em.clear();
+
+  console.log("===== NHIEM VU 2: import, bo dong loi =====");
+  const dong = ["Hay", "", "Tuyet"];
+  await em.transactional(async (em) => {
+    for (const title of dong) {
+      try {
+        await em.transactional(async (em) => {
+          if (!title) throw new Error("title rong");
+          em.create(Comment, { title, post: 1 });
+          await em.flush();
+        });
+      } catch (e) {
+        console.log("Bo qua dong:", JSON.stringify(title), (e as Error).message);
+      }
+    }
+  });
+  em.clear();
+  console.log("Comment con lai:", (await em.find(Comment, {})).map((c) => c.title));
+  em.clear();
+
+  console.log("===== NHIEM VU 3: 1 flush, code viet nguoc =====");
+  const xoa = await em.findOneOrFail(Post, { title: "Bai cua Binh" });
+  console.log("--- SAP FLUSH ---");
+  em.remove(xoa);
+  em.create(Post, { title: "Bai cua Cuong", author: { name: "Cuong", email: "cuong@example.com" } } as any);
+  const an = await em.findOneOrFail(User, 2);
+  an.name = "An Moi";
+  await em.flush();
+  em.clear();
+
+  console.log("===== NHIEM VU 4: xoa mem =====");
+  em.addFilter({ name: "chuaXoa", cond: { deletedAt: null }, entity: [Comment] });
+  const hay = await em.findOneOrFail(Comment, { title: "Hay" });
+  hay.deletedAt = new Date();
+  await em.flush();
+  console.log("updatedAt sau xoa mem:", hay.updatedAt);
+  em.clear();
+  console.log("Co filter:", (await em.find(Comment, {})).map((c) => c.title));
+  console.log("filters:false:", (await em.find(Comment, {}, { filters: false })).map((c) => c.title));
+  em.clear();
+
+  console.log("===== NHIEM VU 5: JSON cho API =====");
+  const p1 = await em.findOneOrFail(Post, 1, { populate: ["author", "comments"] });
+  console.log(JSON.stringify(p1));
+});

@@ -1,0 +1,60 @@
+// BAI 16A — MikroOrmModule.forRoot: ai goi MikroORM.init()?
+import 'reflect-metadata';
+import { Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { MikroORM, SqliteDriver } from '@mikro-orm/sqlite';
+import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+import { User } from './entities/User';
+import { Post } from './entities/Post';
+import { Comment } from './entities/Comment';
+import { taoBangVaSeed } from './orm';
+
+@Module({
+  imports: [
+    MikroOrmModule.forRoot({
+      driver: SqliteDriver,
+      entities: [User, Post, Comment],
+      dbName: ':memory:',
+      metadataProvider: ReflectMetadataProvider,
+      debug: true,
+      logger: console.log,   // in log SQL thang ra console (mac dinh no di qua logger cua Nest)
+    }),
+  ],
+})
+class AppModule {}
+
+async function main() {
+  console.log('--- SAP GOI NestFactory ---');
+  const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error'] });
+  console.log('--- NestFactory XONG ---');
+
+  const orm = app.get(MikroORM);
+  await taoBangVaSeed(orm);            // don dep: tao bang + seed, giong orm.ts cu
+
+  console.log('\n---------- BAT DAU ----------\n');
+  const em = orm.em.fork();
+  const u = await em.findOne(User, 1);
+  console.log('u.name =', u?.name);
+
+  await app.close();
+}
+main();
+
+/* KET QUA (chay 07/10/2026)
+--- SAP GOI NestFactory ---
+[info] MikroORM version: 7.1.14
+[discovery] ORM entity discovery started, using ReflectMetadataProvider
+[discovery] - processing entity User / Post / Comment
+[discovery] - entity discovery finished, found 3 entities
+--- NestFactory XONG ---
+... (tao bang + seed) ...
+---------- BAT DAU ----------
+[query] select `u0`.* from `user` as `u0` where `u0`.`id` = 1 limit 1
+u.name = Than
+
+=> [info] + [discovery] nam GIUA hai moc NestFactory: Nest goi MikroORM.init() ho minh,
+   trong luc khoi dong app. forRoot({...}) chi la noi dua config.
+=> Khac orm.ts cu: phai ghi `driver: SqliteDriver`, vi forRoot den tu @mikro-orm/nestjs
+   (goi chung cho moi DB), khong phai tu @mikro-orm/sqlite.
+*/

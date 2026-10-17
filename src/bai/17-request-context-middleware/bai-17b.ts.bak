@@ -1,0 +1,67 @@
+// BAI 17B — code khong di qua HTTP (cron / queue / worker) thi sao?
+import 'reflect-metadata';
+import { Injectable, Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { MikroORM, EntityManager, SqliteDriver } from '@mikro-orm/sqlite';
+import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+import { User } from './entities/User';
+import { Post } from './entities/Post';
+import { Comment } from './entities/Comment';
+import { taoBangVaSeed } from './orm';
+
+@Injectable()
+class BaoCaoService {
+  constructor(private readonly em: EntityManager) {}
+
+  async demUser() {
+    const users = await this.em.find(User, {});
+    return users.length;
+  }
+}
+
+@Module({
+  imports: [
+    MikroOrmModule.forRoot({
+      driver: SqliteDriver,
+      entities: [User, Post, Comment],
+      dbName: ':memory:',
+      metadataProvider: ReflectMetadataProvider,
+      debug: ['query'],
+      logger: console.log,
+    }),
+  ],
+  providers: [BaoCaoService],
+})
+class AppModule {}
+
+async function main() {
+  const app = await NestFactory.create(AppModule, { logger: ['error'] });
+  await taoBangVaSeed(app.get(MikroORM));
+  await app.listen(3000);
+  console.log('\n---------- BAT DAU ----------\n');
+
+  const baoCao = app.get(BaoCaoService);
+
+  // Gia lap cron chay luc 0h: goi thang vao service, KHONG qua HTTP
+  console.log('--- SAP GOI cron demUser() ---');
+  try {
+    console.log('so user =', await baoCao.demUser());
+  } catch (e) {
+    console.log('LOI:', (e as Error).message);
+  }
+  console.log('--- cron XONG ---');
+
+  await app.close();
+}
+main();
+
+/* KET QUA (chay 16/10/2026)
+--- SAP GOI cron demUser() ---
+LOI: Using global EntityManager instance methods for context specific actions is disallowed. ...
+--- cron XONG ---
+
+=> Loi y het 16B. Middleware chi gan vao route HTTP (forRoutes), goi thang service
+   (cron / queue / worker / onModuleInit) khong di qua route -> khong ai boc RequestContext
+   -> this.em la orm.em toan cuc -> bi chan.
+*/

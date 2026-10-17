@@ -5,6 +5,7 @@ import {
   ManyToOne,
   BeforeCreate,
   BeforeUpdate,
+  BeforeDelete,
 } from "@mikro-orm/decorators/legacy";
 import { Post } from "./Post";
 
@@ -24,6 +25,9 @@ export class Comment {
 
   @Property({ nullable: true })
   updatedAt?: Date;
+
+  @Property({ nullable: true })
+  deletedAt?: Date;
 
   @BeforeCreate()
   ganCreatedAt() {

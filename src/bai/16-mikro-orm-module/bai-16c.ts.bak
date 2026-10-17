@@ -1,0 +1,65 @@
+// BAI 16C — cung bien em do, dat vao trong mot "request"
+import 'reflect-metadata';
+import { Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { MikroORM, EntityManager, SqliteDriver, RequestContext } from '@mikro-orm/sqlite';
+import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+import { User } from './entities/User';
+import { Post } from './entities/Post';
+import { Comment } from './entities/Comment';
+import { taoBangVaSeed } from './orm';
+
+@Module({
+  imports: [
+    MikroOrmModule.forRoot({
+      driver: SqliteDriver,
+      entities: [User, Post, Comment],
+      dbName: ':memory:',
+      metadataProvider: ReflectMetadataProvider,
+      debug: true,
+      logger: console.log,
+    }),
+  ],
+})
+class AppModule {}
+
+async function main() {
+  const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error'] });
+  const orm = app.get(MikroORM);
+  await taoBangVaSeed(orm);
+  console.log('\n---------- BAT DAU ----------\n');
+
+  const em = app.get(EntityManager);          // van la em toan cuc nhu 16B
+
+  console.log('NGOAI request: em.id =', em.id);
+
+  // Gia lap MOT request HTTP: moi thu ben trong ham nay la "trong request"
+  // (as any: TS suy sai kieu do tsconfig, giong cho ep kieu trong orm.ts)
+  await RequestContext.create(em as any, async () => {
+    console.log('TRONG request: em.id =', em.id);
+
+    console.log('--- SAP GOI findOne ---');
+    const u = await em.findOne(User, 1);      // van la bien em o tren, khong doi gi
+    console.log('u.name =', u?.name);
+    console.log('--- findOne XONG ---');
+  });
+
+  await app.close();
+}
+main();
+
+/* KET QUA (chay 16/10/2026)
+---------- BAT DAU ----------
+NGOAI request: em.id = 2
+TRONG request: em.id = 7
+--- SAP GOI findOne ---
+[query] select `u0`.* from `user` as `u0` where `u0`.`id` = 1 limit 1
+u.name = Than
+--- findOne XONG ---
+
+=> Cung mot bien em, khong gan lai, nhung trong RequestContext thi em.id doi.
+   RequestContext.create(em, fn) fork em roi cat ban fork vao "tui" AsyncLocalStorage.
+   Moi ham cua em (findOne, flush, ca getter id) truoc tien hoi getContext():
+   dang trong request -> dung ban fork; ngoai request -> dung chinh no (toan cuc) -> bi chan.
+*/

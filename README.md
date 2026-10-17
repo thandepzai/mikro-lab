@@ -21,9 +21,9 @@ Trong DB luôn có sẵn:
 - `post`: `id = 1, title = 'Bai dau tien', author_id = 1` *(thêm từ bài 6)*
 - Từ bài 8 thêm: user `2 An`, `3 Binh`; post `2 'Bai cua An'` (author 2), `3 'Bai cua Binh'` (author 3)
 
-> **Node 20 → segfault.** `@mikro-orm/sqlite` v7 ghim `better-sqlite3@13`, bản này yêu cầu Node >= 22.
-> Chạy trên Node 20 thì process chết ngay (exit 139) mà không có message. Repo đã hạ xuống bằng
-> `overrides` trong `package.json`. Nếu sau này nâng lên Node 22+ thì xoá `overrides` đi.
+> **Bắt buộc Node 22+** (`nvm use`, đã có `.nvmrc`). MikroORM v7 yêu cầu Node >= 22.17.
+> Bài 1–17 chạy tạm được trên Node 20 nhờ `overrides` hạ `better-sqlite3`, nhưng từ bài 18
+> `@mikro-orm/migrations` dùng `fs.globSync` (chỉ có từ Node 22) → đã nâng lên Node 22 và bỏ `overrides`.
 
 ## Quy ước trong repo
 
@@ -156,9 +156,9 @@ Nó chỉ nhìn xem object đang nằm trong cái nào ở trên rồi đặt t�
 
 ### Chương 4 — NestJS thật
 
-- [ ] **16. `MikroOrmModule`** — `forRoot` / `forFeature`, inject `EntityRepository`
-- [ ] **17. `RequestContext` middleware** — và `@CreateRequestContext()` cho cron / queue / worker
-- [ ] **18. Migration** — `SchemaGenerator` vs migration thật, quy trình an toàn khi deploy
+- [x] **16. `MikroOrmModule`** — `forRoot`, inject `EntityManager` → [ghi chú](src/bai/16-mikro-orm-module/) *(`forFeature` / `EntityRepository` để dành)*
+- [x] **17. `RequestContext` middleware** — và `@CreateRequestContext()` cho cron / queue / worker → [ghi chú](src/bai/17-request-context-middleware/)
+- [ ] **18. Migration** — `SchemaGenerator` vs migration thật, quy trình an toàn khi deploy → [ghi chú](src/bai/18-migration/) *(đang học: xong 18A–D, còn 18E)*
 - [ ] **19. Testing** — sqlite in-memory, rollback sau mỗi test
 - [ ] **20. Performance** — partial loading, batch insert, result cache, khi nào tắt Identity Map
 
@@ -185,6 +185,8 @@ Mỗi bài một thư mục trong `src/bai/`, gồm `README.md` (ghi chú + đá
 | 13 | [Filters](src/bai/13-filters/) | `em.addFilter({ name, cond, entity })` — 1 object, tự chèn `WHERE` vào mọi `find`/`findOne` cho entity đó, mặc định luôn bật (`filters: false` để tắt tạm). `cond` dạng hàm + `args: true` → truyền tham số riêng mỗi lần gọi, dùng cho multi-tenant thật (tenantId lấy từ request, không hardcode). |
 | 14 | [Hooks](src/bai/14-hooks/) | `@BeforeCreate`/`@BeforeUpdate` chạy sau `begin`, trước khi dựng SQL → giá trị gán đi luôn vào `insert`/`update`. `createdAt` chỉ gán lúc tạo. **Bẫy:** `?` của TS không làm cột được NULL — phải `@Property({ nullable: true })`. |
 | 15 | [Serialization](src/bai/15-serialization/) | Quan hệ chưa load bị bỏ khỏi JSON. `hidden: true` chỉ giấu khỏi JSON — vẫn `select`, vẫn đọc được `u.email`. Populate `posts` thì `author` trong post chỉ in id (tránh vòng lặp). |
+| 16 | [`MikroOrmModule`](src/bai/16-mikro-orm-module/) | `forRoot` chỉ ghi config, `NestFactory` gọi `init()` rồi cất vào DI container. `em` inject = `orm.em` toàn cục → ngoài request bị chặn. Trong `RequestContext.create` cùng biến `em` chạy được, `em.id` đổi: `em` toàn cục là vỏ chuyển tiếp sang bản fork. |
+| 17 | [`RequestContext` middleware](src/bai/17-request-context-middleware/) | `forRoot` tự gắn middleware cho mọi route: `RequestContext.create(orm.em, next)` → mỗi HTTP request một bản fork. Cron/queue/worker không qua route → lỗi như 16B. Sửa bằng `@CreateRequestContext()` (class cần property `em` hoặc `orm`). |
 
 ---
 
@@ -226,7 +228,7 @@ chỉ mở ra khi cần. Tóm tắt bối cảnh:
   quanh lời gọi cần soi — để nhìn ra câu SQL rơi vào giữa hai mốc nào. Nhịp này chạy được.
 - **Không khẳng định hành vi ORM khi chưa chạy thử.** Bài 4 đã viết sai một bảng vào README vì
   suy luận thay vì chạy. Chạy trước, viết sau.
-- **Tiếp theo:** bài 16 — `MikroOrmModule` (mở đầu Chương 4 NestJS). **Hết Chương 3.** Entity hiện tại: `Comment` có `createdAt`/`updatedAt` + 2 hook; `User.email` là `hidden: true`. EventSubscriber (bài 14) còn để dành.
+- **Tiếp theo:** đang giữa bài 18 — xong 18A–D, `src/main.ts` đang là 18D. Bước kế: người học sửa `up()` trong `src/migrations/Migration....ts` thành 2 câu `rename column`, rồi làm 18E (`migrator.up()`). Xem mục "Học tiếp từ đây" trong [ghi chú bài 18](src/bai/18-migration/). Người học dễ rối khi sandbox "tạo rồi xoá" để giả lập DB cũ → bài 18 dùng entity riêng `KhachHang` + DB cũ dựng bằng SQL tay, kể theo câu chuyện "DB tháng 1 / code tháng 3". Còn để dành: `forFeature` / `EntityRepository` (bài 16). Bài 16 xong 16A–D, bài 17 xong 17A–C (có HTTP thật qua `@nestjs/platform-express`); người học yếu phần NestJS cơ bản (decorator, `NestFactory`, DI) → giải thích bằng JS thuần trước. Sandbox bài 16+ dùng `MikroOrmModule.forRoot` + `taoBangVaSeed(orm)` trong `main.ts`. Entity hiện tại: `Comment` có `createdAt`/`updatedAt`/`deletedAt` (đều nullable) + hook; `User.email` là `hidden: true`. Đã làm bài tập lớn Chương 3 (`src/bai/00c-bai-tap-lon-chuong-3/`), đạt cả 5 nhiệm vụ. EventSubscriber (bài 14) còn để dành.
 - **Sandbox đổi từ bài 10:** `orm.ts` truyền `em` kiểu `EntityManager` của `@mikro-orm/sqlite` (ép kiểu) để có `createQueryBuilder`. Seed có 3 user, 3 post (xem phần Chạy).
 - **Còn treo:** project ở công ty đang chạy MikroORM version mấy? (`npm ls @mikro-orm/core`)
   Nếu là v6 thì phần `import` và cấu hình sẽ khác sandbox này.

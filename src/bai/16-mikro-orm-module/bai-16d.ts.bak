@@ -1,0 +1,65 @@
+// BAI 16D — fork() tao ra so rieng that khong?
+import 'reflect-metadata';
+import { Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { MikroORM, SqliteDriver } from '@mikro-orm/sqlite';
+import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+import { User } from './entities/User';
+import { Post } from './entities/Post';
+import { Comment } from './entities/Comment';
+import { taoBangVaSeed } from './orm';
+
+@Module({
+  imports: [
+    MikroOrmModule.forRoot({
+      driver: SqliteDriver,
+      entities: [User, Post, Comment],
+      dbName: ':memory:',
+      metadataProvider: ReflectMetadataProvider,
+      debug: true,
+      logger: console.log,
+    }),
+  ],
+})
+class AppModule {}
+
+async function main() {
+  const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error'] });
+  const orm = app.get(MikroORM);
+  await taoBangVaSeed(orm);
+  console.log('\n---------- BAT DAU ----------\n');
+
+  const em1 = orm.em.fork();
+  const em2 = orm.em.fork();
+  console.log('em1.id =', em1.id, '| em2.id =', em2.id);
+
+  console.log('--- SAP GOI em1.findOne ---');
+  const u1 = await em1.findOne(User, 1);
+  console.log('--- SAP GOI em2.findOne ---');
+  const u2 = await em2.findOne(User, 1);
+  console.log('--- SAP GOI em1.findOne LAN 2 ---');
+  const u1LanHai = await em1.findOne(User, 1);
+  console.log('--- XONG ---');
+
+  console.log('u1 === u2 ?', u1 === u2);
+  console.log('u1 === u1LanHai ?', u1 === u1LanHai);
+
+  await app.close();
+}
+main();
+
+/* KET QUA (chay 16/10/2026)
+em1.id = 7 | em2.id = 8
+--- SAP GOI em1.findOne ---
+[query] select `u0`.* from `user` as `u0` where `u0`.`id` = 1 limit 1
+--- SAP GOI em2.findOne ---
+[query] select `u0`.* from `user` as `u0` where `u0`.`id` = 1 limit 1
+--- SAP GOI em1.findOne LAN 2 ---
+--- XONG ---
+u1 === u2 ? false
+u1 === u1LanHai ? true
+
+=> 2 cau select. em1 doc lai lan 2 khong select: user 1 da nam trong Map cua em1.
+   Cung dong DB nhung 2 em -> 2 object khac nhau: moi ban fork co Identity Map rieng (va so rieng).
+*/

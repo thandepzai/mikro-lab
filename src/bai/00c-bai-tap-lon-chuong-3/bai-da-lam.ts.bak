@@ -1,0 +1,167 @@
+import { run } from "./orm";
+import { Post } from "./entities/Post";
+import { User } from "./entities/User";
+import { Comment } from "./entities/Comment";
+import { ref } from "@mikro-orm/core";
+
+// ================================================================
+//  BAI TAP LON — ON TAP CHUONG 3: "Ghi du lieu cho dung"
+//  Lam TUNG nhiem vu mot. Xong nhiem vu nao -> npm run dev -> gui log cho Claude cham.
+//  Du lieu co san: 3 user (Than, An, Binh), 3 post:
+//    1 'Bai dau tien' (Than) | 2 'Bai cua An' (An) | 3 'Bai cua Binh' (Binh)
+//  Chua co comment nao.
+//  Cuoi moi nhiem vu nho em.clear() de nhiem vu sau bat dau sach.
+// ================================================================
+
+run(async (em) => {
+  console.log("===== NHIEM VU 1: chuyen tac gia, loi giua chung =====");
+  // ----------------------------------------------------------------
+  // Trong CUNG MOT transaction:
+  //   - doi tac gia cua 'Bai cua Binh' thanh An (id 2)
+  //   - tao comment 'Da chuyen tac gia' cho bai do
+  //   - flush, roi gia lap loi: throw new Error('mat ket noi')
+  // Bat loi o ngoai de chuong trinh chay tiep.
+  // Sau do em.clear(), load lai bai 'Bai cua Binh' kem tac gia, in ra:
+  //   Tac gia: <ten> | so comment: <em.count(Comment, {})>
+  // YEU CAU:
+  //   - Log co begin ... rollback (khong co commit)
+  //   - In ra: Tac gia: Binh | so comment: 0
+  // CAU HOI (tra loi vao day): trong flush do, insert comment hay update post chay truoc? Vi sao?
+  //   ->
+
+  // TODO
+  await em
+    .transactional(async (em) => {
+      const postBinh = await em.findOneOrFail(Post, { title: "Bai cua Binh" });
+      postBinh.author = ref(User, 2);
+      em.create(Comment, { title: "Da chuyen tac gia", post: postBinh });
+      await em.flush();
+      throw new Error("mat ket noi");
+    })
+    .catch((err) => {
+      console.error("Loi trong transaction:", err.message);
+    });
+  em.clear();
+  const postBinhAfter = await em.findOneOrFail(
+    Post,
+    { title: "Bai cua Binh" },
+    { populate: ["author", "comments"] },
+  );
+  console.log(
+    `Tac gia: ${postBinhAfter.author.$.name} | so comment: ${postBinhAfter.comments.length}`,
+  );
+  em.clear();
+
+  console.log("===== NHIEM VU 2: import comment, bo dong loi =====");
+  // ----------------------------------------------------------------
+  // Gia lap import file: const dong = ['Hay', '', 'Tuyet'];  (tat ca vao post 1)
+  // Dong nao title rong thi throw Error('title rong') -> BO QUA dong do,
+  // cac dong khac VAN LUU. Tat ca nam trong 1 transaction lon.
+  // Cuoi cung in ra danh sach title comment con trong DB.
+  // YEU CAU:
+  //   - Chi 1 cap begin/commit ngoai cung
+  //   - Log co savepoint va rollback to savepoint
+  //   - In ra: [ 'Hay', 'Tuyet' ]
+
+  // TODO
+  const dong = ["Hay", "", "Tuyet"];
+
+  const post1 = await em.findOneOrFail(Post, { title: "Bai dau tien" });
+  await em.transactional(async (em) => {
+    for (const title of dong) {
+      await em
+        .transactional(async (em) => {
+          if (!title) throw new Error("title rong");
+          em.create(Comment, { title, post: post1 });
+          await em.flush();
+        })
+        .catch((err) => {
+          console.error(`Loi khi import comment '${title}':`, err.message);
+        });
+    }
+  });
+  const comments = await em.find(Comment, {});
+  console.log(
+    "Danh sach comment con trong DB:",
+    comments.map((c) => c.title),
+  );
+  em.clear();
+
+  console.log("===== NHIEM VU 3: mot flush, code viet nguoc =====");
+  // ----------------------------------------------------------------
+  // Chuan bi (select, dat TRUOC moc): load 'Bai cua Binh' va user An (id 2).
+  // Sau moc console.log('--- SAP FLUSH ---'), viet DUNG thu tu nay:
+  //   1. em.remove('Bai cua Binh')
+  //   2. doi ten An thanh 'An Moi'
+  //   3. tao post 'Bai cua Cuong' voi tac gia MOI: Cuong / cuong@example.com
+  //   4. await em.flush()   (chi 1 lan)
+  // TRUOC KHI CHAY, doan thu tu cac cau SQL giua begin va commit:
+  //   ->
+  // YEU CAU: 1 cap begin/commit; ghi lai thu tu thuc te sau khi chay.
+
+  // TODO
+  const postBinh = await em.findOneOrFail(Post, { title: "Bai cua Binh" });
+  const an = await em.findOneOrFail(User, { id: 2 });
+  console.log("--- SAP FLUSH ---");
+  em.remove(postBinh);
+  an.name = "An Moi";
+  em.create(Post, {
+    title: "Bai cua Cuong",
+    author: { name: "Cuong", email: "cuong@example.com" },
+  });
+  await em.flush();
+  em.clear();
+
+  console.log("===== NHIEM VU 4: xoa mem comment =====");
+  // ----------------------------------------------------------------
+  // B1: Mo src/entities/Comment.ts, them field deletedAt (nho bay bai 14!).
+  // B2: Dang ky filter 'chuaXoa' cho Comment: chi lay comment chua bi xoa mem.
+  // B3: Tim comment 'Hay', "xoa mem" no (KHONG dung em.remove), flush.
+  //     In ra updatedAt cua no.
+  // B4: em.clear(), in danh sach title comment: 1 lan co filter, 1 lan tat filter.
+  // YEU CAU:
+  //   - Log co update ... set deleted_at = ... (KHONG co delete from)
+  //   - Co filter: [ 'Tuyet' ]   |   Tat filter: [ 'Hay', 'Tuyet' ]
+  // CAU HOI: updatedAt sau khi xoa mem co gia tri khong? Ai gan no?
+  //   ->
+
+  // TODO
+  em.addFilter({
+    name: "chuaXoa",
+    cond: { deletedAt: { $eq: null } },
+    entity: [Comment],
+  });
+  const commentHay = await em.findOneOrFail(Comment, { title: "Hay" });
+  commentHay.deletedAt = new Date();
+  await em.flush();
+  console.log("updatedAt cua comment 'Hay':", commentHay.updatedAt);
+  em.clear();
+  const commentsWithFilter = await em.find(Comment, {});
+  console.log(
+    "Danh sach comment co filter:",
+    commentsWithFilter.map((c) => c.title),
+  );
+  const commentsWithoutFilter = await em.find(Comment, {}, { filters: false });
+  console.log(
+    "Danh sach comment tat filter:",
+    commentsWithoutFilter.map((c) => c.title),
+  );
+  em.clear();
+
+  console.log("===== NHIEM VU 5: JSON tra ve cho API =====");
+  // ----------------------------------------------------------------
+  // In JSON.stringify cua post 1 kem tac gia va danh sach comment.
+  // YEU CAU:
+  //   - Chi 1 lenh find/findOne
+  //   - author co name, KHONG co email
+  //   - comments KHONG co 'Hay' (da xoa mem)
+  // CAU HOI: ban khong truyen filter gi cho phan comments, sao 'Hay' van bien mat?
+  //   ->
+
+  // TODO
+  const post2 = await em.findOneOrFail(Post, { title: "Bai dau tien" }, { populate: ["author", "comments"] });
+  console.log(JSON.stringify(post2, null, 2));
+  // Hình như em.filter không bị dính clear()
+  em.clear();
+  console.log("--- XONG ---");
+});

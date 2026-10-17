@@ -1,0 +1,40 @@
+// BAI 18B — doi ten 1 property: ORM hieu la "doi ten" hay "xoa roi tao moi"?
+import 'reflect-metadata';
+import { MikroORM } from '@mikro-orm/sqlite';
+import { Entity, PrimaryKey, Property, ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+
+// CODE THANG 3: doi ten hoTen -> name
+@Entity()
+class KhachHang {
+  @PrimaryKey()
+  id!: number;
+
+  @Property()
+  name!: string;
+}
+
+async function main() {
+  const orm = await MikroORM.init({
+    entities: [KhachHang],
+    dbName: ':memory:',
+    metadataProvider: ReflectMetadataProvider,
+  });
+  const conn = orm.em.getConnection();
+
+  // DB THANG 1: cot ten la ho_ten — da co 3 khach
+  await conn.execute('create table `khach_hang` (`id` integer not null primary key autoincrement, `ho_ten` text not null)');
+  await conn.execute("insert into `khach_hang` (`ho_ten`) values ('Than'), ('An'), ('Binh')");
+
+  console.log('\n---------- BAT DAU ----------\n');
+  console.log('DB hien tai:', await conn.execute('select * from `khach_hang`'));
+
+  console.log('\n--- 1. HOI ORM: dinh chay SQL gi? ---');
+  console.log(await orm.schema.getUpdateSchemaSQL());
+
+  console.log('--- 2. CHAY THAT ---');
+  await orm.schema.update();
+  console.log('DB sau khi update:', await conn.execute('select * from `khach_hang`'));
+
+  await orm.close(true);
+}
+main();

@@ -1,0 +1,73 @@
+// BAI 17A — HTTP that: ai boc moi request vao RequestContext?
+import 'reflect-metadata';
+import { Controller, Get, Module, Param } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { MikroORM, EntityManager, SqliteDriver } from '@mikro-orm/sqlite';
+import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+import { User } from './entities/User';
+import { Post } from './entities/Post';
+import { Comment } from './entities/Comment';
+import { taoBangVaSeed } from './orm';
+
+@Controller('users')
+class UserController {
+  constructor(private readonly em: EntityManager) {}
+
+  @Get(':id')
+  async layUser(@Param('id') id: string) {
+    console.log('  [controller] em.id =', this.em.id);
+    const u = await this.em.findOne(User, Number(id));
+    return { name: u?.name };
+  }
+}
+
+@Module({
+  imports: [
+    MikroOrmModule.forRoot({
+      driver: SqliteDriver,
+      entities: [User, Post, Comment],
+      dbName: ':memory:',
+      metadataProvider: ReflectMetadataProvider,
+      debug: ['query'],
+      logger: console.log,
+    }),
+  ],
+  controllers: [UserController],
+})
+class AppModule {}
+
+async function main() {
+  const app = await NestFactory.create(AppModule, { logger: ['error'] });
+  await taoBangVaSeed(app.get(MikroORM));
+  await app.listen(3000);
+  console.log('\n---------- BAT DAU ----------\n');
+
+  console.log('NGOAI request: em.id =', app.get(EntityManager).id);
+
+  console.log('--- SAP GOI GET /users/1 (lan 1) ---');
+  console.log('tra ve:', await (await fetch('http://localhost:3000/users/1')).json());
+
+  console.log('--- SAP GOI GET /users/1 (lan 2) ---');
+  console.log('tra ve:', await (await fetch('http://localhost:3000/users/1')).json());
+
+  await app.close();
+}
+main();
+
+/* KET QUA (chay 16/10/2026)
+NGOAI request: em.id = 2
+--- SAP GOI GET /users/1 (lan 1) ---
+  [controller] em.id = 7
+[query] select `u0`.* from `user` as `u0` where `u0`.`id` = ? limit ?
+tra ve: { name: 'Than' }
+--- SAP GOI GET /users/1 (lan 2) ---
+  [controller] em.id = 8
+[query] select `u0`.* from `user` as `u0` where `u0`.`id` = ? limit ?
+tra ve: { name: 'Than' }
+
+=> Khong goi RequestContext.create, khong fork, van chay. MikroOrmModule tu dang ky
+   MikroOrmMiddleware cho moi route: use(req, res, next) { RequestContext.create(this.orm.em, next) }.
+   Moi request mot ban fork moi (7, 8) -> Identity Map chi song trong 1 request,
+   request 2 lai select, khong phai cache giua cac request.
+*/

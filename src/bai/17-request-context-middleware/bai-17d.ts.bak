@@ -1,0 +1,89 @@
+// BAI 17D — ham co @CreateRequestContext() goi sang service KHAC: service kia dung em nao?
+import 'reflect-metadata';
+import { Injectable, Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { MikroORM, EntityManager, SqliteDriver } from '@mikro-orm/sqlite';
+import { ReflectMetadataProvider, CreateRequestContext } from '@mikro-orm/decorators/legacy';
+import { User } from './entities/User';
+import { Post } from './entities/Post';
+import { Comment } from './entities/Comment';
+import { taoBangVaSeed } from './orm';
+
+@Injectable()
+class PostService {
+  constructor(private readonly em: EntityManager) {}
+
+  async demPost() {
+    console.log('  [PostService.demPost] em.id =', this.em.id);
+    const posts = await this.em.find(Post, {});
+    return posts.length;
+  }
+}
+
+@Injectable()
+class BaoCaoService {
+  constructor(
+    private readonly em: EntityManager,
+    private readonly postService: PostService,
+  ) {}
+
+  @CreateRequestContext()
+  async baoCao() {
+    console.log('  [BaoCaoService.baoCao] em.id =', this.em.id);
+    const soUser = (await this.em.find(User, {})).length;
+    const soPost = await this.postService.demPost();
+    return { soUser, soPost };
+  }
+}
+
+@Module({
+  imports: [
+    MikroOrmModule.forRoot({
+      driver: SqliteDriver,
+      entities: [User, Post, Comment],
+      dbName: ':memory:',
+      metadataProvider: ReflectMetadataProvider,
+      debug: ['query'],
+      logger: console.log,
+    }),
+  ],
+  providers: [BaoCaoService, PostService],
+})
+class AppModule {}
+
+async function main() {
+  const app = await NestFactory.create(AppModule, { logger: ['error'] });
+  await taoBangVaSeed(app.get(MikroORM));
+  await app.listen(3000);
+  console.log('\n---------- BAT DAU ----------\n');
+
+  const baoCao = app.get(BaoCaoService);
+  console.log('NGOAI: em.id =', app.get(EntityManager).id);
+
+  // Gia lap cron chay luc 0h: goi thang vao service, KHONG qua HTTP
+  console.log('--- SAP GOI cron baoCao() ---');
+  try {
+    console.log('ket qua =', await baoCao.baoCao());
+  } catch (e) {
+    console.log('LOI:', (e as Error).message);
+  }
+  console.log('--- cron XONG ---');
+
+  await app.close();
+}
+main();
+
+/* KET QUA (chay 16/10/2026)
+NGOAI: em.id = 2
+--- SAP GOI cron baoCao() ---
+  [BaoCaoService.baoCao] em.id = 7
+[query] select `u0`.* from `user` as `u0`
+  [PostService.demPost] em.id = 7
+[query] select `p0`.* from `post` as `p0`
+ket qua = { soUser: 3, soPost: 3 }
+--- cron XONG ---
+
+=> PostService khong co decorator van chay, va dung CHUNG ban fork #7.
+   RequestContext di theo ca chuoi await: moi service duoc goi ben trong deu chuyen tiep sang cung ban fork.
+*/

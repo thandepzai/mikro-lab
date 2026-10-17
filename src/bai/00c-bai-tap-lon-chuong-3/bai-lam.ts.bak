@@ -1,0 +1,88 @@
+import { run } from "./orm";
+import { Post } from "./entities/Post";
+import { User } from "./entities/User";
+import { Comment } from "./entities/Comment";
+
+// ================================================================
+//  BAI TAP LON — ON TAP CHUONG 3: "Ghi du lieu cho dung"
+//  Lam TUNG nhiem vu mot. Xong nhiem vu nao -> npm run dev -> gui log cho Claude cham.
+//  Du lieu co san: 3 user (Than, An, Binh), 3 post:
+//    1 'Bai dau tien' (Than) | 2 'Bai cua An' (An) | 3 'Bai cua Binh' (Binh)
+//  Chua co comment nao.
+//  Cuoi moi nhiem vu nho em.clear() de nhiem vu sau bat dau sach.
+// ================================================================
+
+run(async (em) => {
+  console.log("===== NHIEM VU 1: chuyen tac gia, loi giua chung =====");
+  // ----------------------------------------------------------------
+  // Trong CUNG MOT transaction:
+  //   - doi tac gia cua 'Bai cua Binh' thanh An (id 2)
+  //   - tao comment 'Da chuyen tac gia' cho bai do
+  //   - flush, roi gia lap loi: throw new Error('mat ket noi')
+  // Bat loi o ngoai de chuong trinh chay tiep.
+  // Sau do em.clear(), load lai bai 'Bai cua Binh' kem tac gia, in ra:
+  //   Tac gia: <ten> | so comment: <em.count(Comment, {})>
+  // YEU CAU:
+  //   - Log co begin ... rollback (khong co commit)
+  //   - In ra: Tac gia: Binh | so comment: 0
+  // CAU HOI (tra loi vao day): trong flush do, insert comment hay update post chay truoc? Vi sao?
+  //   -> 
+
+  // TODO
+
+  console.log("===== NHIEM VU 2: import comment, bo dong loi =====");
+  // ----------------------------------------------------------------
+  // Gia lap import file: const dong = ['Hay', '', 'Tuyet'];  (tat ca vao post 1)
+  // Dong nao title rong thi throw Error('title rong') -> BO QUA dong do,
+  // cac dong khac VAN LUU. Tat ca nam trong 1 transaction lon.
+  // Cuoi cung in ra danh sach title comment con trong DB.
+  // YEU CAU:
+  //   - Chi 1 cap begin/commit ngoai cung
+  //   - Log co savepoint va rollback to savepoint
+  //   - In ra: [ 'Hay', 'Tuyet' ]
+
+  // TODO
+
+  console.log("===== NHIEM VU 3: mot flush, code viet nguoc =====");
+  // ----------------------------------------------------------------
+  // Chuan bi (select, dat TRUOC moc): load 'Bai cua Binh' va user An (id 2).
+  // Sau moc console.log('--- SAP FLUSH ---'), viet DUNG thu tu nay:
+  //   1. em.remove('Bai cua Binh')
+  //   2. doi ten An thanh 'An Moi'
+  //   3. tao post 'Bai cua Cuong' voi tac gia MOI: Cuong / cuong@example.com
+  //   4. await em.flush()   (chi 1 lan)
+  // TRUOC KHI CHAY, doan thu tu cac cau SQL giua begin va commit:
+  //   -> 
+  // YEU CAU: 1 cap begin/commit; ghi lai thu tu thuc te sau khi chay.
+
+  // TODO
+
+  console.log("===== NHIEM VU 4: xoa mem comment =====");
+  // ----------------------------------------------------------------
+  // B1: Mo src/entities/Comment.ts, them field deletedAt (nho bay bai 14!).
+  // B2: Dang ky filter 'chuaXoa' cho Comment: chi lay comment chua bi xoa mem.
+  // B3: Tim comment 'Hay', "xoa mem" no (KHONG dung em.remove), flush.
+  //     In ra updatedAt cua no.
+  // B4: em.clear(), in danh sach title comment: 1 lan co filter, 1 lan tat filter.
+  // YEU CAU:
+  //   - Log co update ... set deleted_at = ... (KHONG co delete from)
+  //   - Co filter: [ 'Tuyet' ]   |   Tat filter: [ 'Hay', 'Tuyet' ]
+  // CAU HOI: updatedAt sau khi xoa mem co gia tri khong? Ai gan no?
+  //   -> 
+
+  // TODO
+
+  console.log("===== NHIEM VU 5: JSON tra ve cho API =====");
+  // ----------------------------------------------------------------
+  // In JSON.stringify cua post 1 kem tac gia va danh sach comment.
+  // YEU CAU:
+  //   - Chi 1 lenh find/findOne
+  //   - author co name, KHONG co email
+  //   - comments KHONG co 'Hay' (da xoa mem)
+  // CAU HOI: ban khong truyen filter gi cho phan comments, sao 'Hay' van bien mat?
+  //   -> 
+
+  // TODO
+
+  console.log("--- XONG ---");
+});
