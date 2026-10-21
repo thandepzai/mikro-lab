@@ -1,0 +1,92 @@
+// BAI 18G — NestJS: goi migrator.up() truoc app.listen()
+// DB server-18g.sqlite dung o v1 (id, name, phone). Code moi da co email (file C cho san tren server).
+// node dist/main.js co-up    -> bootstrap co dong up()
+// node dist/main.js khong-up -> bootstrap quen dong up()
+import 'reflect-metadata';
+import { rmSync } from 'node:fs';
+import { Controller, Get, Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { MikroORM, EntityManager, SqliteDriver } from '@mikro-orm/sqlite';
+import { Migrator } from '@mikro-orm/migrations';
+import { Entity, PrimaryKey, Property, ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+
+// CODE MOI: co email
+@Entity({ tableName: 'khach_hang' })
+class KhachHang {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  name?: string;
+
+  @Property({ nullable: true })
+  phone?: string;
+
+  @Property({ nullable: true })
+  email?: string;
+}
+
+const DB = 'server-18g.sqlite';
+const config = {
+  entities: [KhachHang],
+  dbName: DB,
+  metadataProvider: ReflectMetadataProvider,
+  extensions: [Migrator],
+  migrations: { path: 'dist/demo-18g', pathTs: 'src/demo-18g' },
+};
+
+@Controller('khach')
+class KhachController {
+  constructor(private readonly em: EntityManager) {}
+
+  @Get('them')
+  async them() {
+    this.em.create(KhachHang, { name: 'An', email: 'an@gmail.com' });
+    await this.em.flush();
+    return this.em.find(KhachHang, {});
+  }
+}
+
+@Module({
+  imports: [MikroOrmModule.forRoot({ driver: SqliteDriver, ...config })],
+  controllers: [KhachController],
+})
+class AppModule {}
+
+async function dungServerThangTruoc() {
+  rmSync(DB, { force: true });
+  const orm = await MikroORM.init(config);
+  await orm.migrator.up({ to: 'Migration20261021092250' });
+  await orm.close(true);
+}
+
+async function bootstrap(coUp: boolean) {
+  const app = await NestFactory.create(AppModule, { logger: ['error'] });
+  const orm = app.get(MikroORM);
+  const cot = async () => ((await orm.em.getConnection().execute('pragma table_info(khach_hang)')) as { name: string }[]).map(c => c.name);
+
+  console.log('1. Cot trong DB truoc up():', await cot());
+  if (coUp) {
+    const daChay = await orm.migrator.up();
+    console.log('2. up() vua chay:', daChay.map(m => m.name));
+  } else {
+    console.log('2. (quen goi up())');
+  }
+  console.log('3. Cot trong DB truoc listen():', await cot());
+
+  await app.listen(3000);
+  console.log('4. Server mo cong 3000. Khach goi GET /khach/them ...');
+  const res = await fetch('http://localhost:3000/khach/them');
+  console.log('5. Tra ve:', res.status, await res.json());
+
+  await app.close();
+}
+
+async function main() {
+  const coUp = process.argv[2] !== 'khong-up';
+  console.log(`========== BOOTSTRAP ${coUp ? 'CO' : 'KHONG CO'} up() ==========`);
+  await dungServerThangTruoc();
+  await bootstrap(coUp);
+}
+main();

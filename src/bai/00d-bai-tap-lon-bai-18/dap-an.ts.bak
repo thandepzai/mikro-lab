@@ -1,0 +1,286 @@
+// BAI TAP LON BAI 18 — MIGRATION (DAP AN)
+import 'reflect-metadata';
+import { mkdirSync, rmSync } from 'node:fs';
+import { Controller, Get, Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { MikroORM, EntityManager, SqliteDriver, EntityClass } from '@mikro-orm/sqlite';
+import { Migrator } from '@mikro-orm/migrations';
+import { Entity, PrimaryKey, Property, ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamNV1 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  ten?: string;
+
+  @Property({ default: 0 })
+  gia!: number;
+}
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamDoi1 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  tenSp?: string;
+
+  @Property({ nullable: true })
+  moTa?: string;
+}
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamDoi2 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  tenSp?: string;
+
+  @Property({ nullable: true })
+  ghiChu?: string;
+}
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamV1 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  ten?: string;
+}
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamV2 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  ten?: string;
+
+  @Property({ nullable: true })
+  gia?: number;
+}
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamNV6 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  tenSp?: string;
+
+  @Property({ nullable: true })
+  ghiChu?: string;
+
+  @Property({ default: 0 })
+  gia!: number;
+}
+
+// ================= HAM CO SAN =================
+mkdirSync('db-bt18', { recursive: true });
+const db = (ten: string) => `db-bt18/${ten}.sqlite`;
+
+const moORM = (entity: EntityClass<object>, dbName: string, thuMuc = 'chung', debug = false) =>
+  MikroORM.init({
+    entities: [entity],
+    dbName,
+    metadataProvider: ReflectMetadataProvider,
+    extensions: [Migrator],
+    migrations: { path: `dist/bt18/${thuMuc}`, pathTs: `src/bt18/${thuMuc}` },
+    debug: debug ? ['query'] : false,
+  });
+
+type ORM = Awaited<ReturnType<typeof moORM>>;
+
+const xoaThuMuc = (thuMuc: string) => {
+  rmSync(`src/bt18/${thuMuc}`, { recursive: true, force: true });
+  rmSync(`dist/bt18/${thuMuc}`, { recursive: true, force: true });
+};
+
+const doi1Giay = () => new Promise(r => setTimeout(r, 1100));
+
+async function taoDBCu(dbName: string, coMoTa: boolean) {
+  rmSync(dbName, { force: true });
+  const orm = await moORM(SanPhamV1, dbName);
+  const conn = orm.em.getConnection();
+  if (coMoTa) {
+    await conn.execute('create table `san_pham` (`id` integer not null primary key autoincrement, `ten` text null, `mo_ta` text null)');
+    await conn.execute("insert into `san_pham` (`ten`, `mo_ta`) values ('But', 'Viet xanh'), ('Vo', '100 trang'), ('Thuoc', '30cm')");
+  } else {
+    await conn.execute('create table `san_pham` (`id` integer not null primary key autoincrement, `ten` text null)');
+    await conn.execute("insert into `san_pham` (`ten`) values ('But'), ('Vo'), ('Thuoc')");
+  }
+  await orm.close(true);
+}
+
+async function xem(orm: ORM, nhan: string) {
+  const conn = orm.em.getConnection();
+  const cot = ((await conn.execute('pragma table_info(san_pham)')) as { name: string }[]).map(c => c.name);
+  const dong = cot.length ? await conn.execute('select * from `san_pham`') : [];
+  let so: string[] | string = 'chua co so';
+  try {
+    so = ((await conn.execute('select `name` from `mikro_orm_migrations`')) as { name: string }[]).map(r => r.name);
+  } catch {}
+  console.log(`\n--- ${nhan} ---`);
+  console.log('Cot :', cot);
+  console.log('Dong:', dong);
+  console.log('So  :', so);
+}
+
+// ================= NHIEM VU =================
+async function nv1() {
+  const file = db('nv1');
+  await taoDBCu(file, false);
+  const orm = await moORM(SanPhamNV1, file);
+  console.log('SQL se chay:', await orm.schema.getUpdateSchemaSQL());
+  try {
+    await orm.schema.update();
+  } catch (e) {
+    console.log('LOI:', (e as Error).message);
+  }
+  await xem(orm, 'Sau schema.update()');
+  await orm.close(true);
+}
+
+async function nv2() {
+  const file = db('nv2');
+  await taoDBCu(file, true);
+
+  const doi1 = await moORM(SanPhamDoi1, file);
+  console.log('Doi 1 cot:', await doi1.schema.getUpdateSchemaSQL());
+  await doi1.close(true);
+
+  const doi2 = await moORM(SanPhamDoi2, file);
+  console.log('Doi 2 cot:', await doi2.schema.getUpdateSchemaSQL());
+  await doi2.close(true);
+}
+
+async function nv3Tao() {
+  const file = db('nv3');
+  xoaThuMuc('nv3');
+  await taoDBCu(file, true);
+  const orm = await moORM(SanPhamDoi2, file, 'nv3');
+  const kq = await orm.migrator.create();
+  console.log('File moi:', kq.fileName);
+  console.log('up  :', kq.diff.up);
+  console.log('down:', kq.diff.down);
+  await orm.close(true);
+}
+
+async function vongTron(orm: ORM) {
+  await xem(orm, '0. Ban dau');
+  const buoc = async (nhan: string, chay: () => Promise<unknown>) => {
+    try {
+      await chay();
+    } catch (e) {
+      console.log('LOI:', (e as Error).message);
+    }
+    await xem(orm, nhan);
+  };
+  await buoc('1. Sau up()', () => orm.migrator.up());
+  await buoc('2. Sau down()', () => orm.migrator.down());
+  await buoc('3. Sau up() lan 2', () => orm.migrator.up());
+}
+
+async function nv3Chay() {
+  const file = db('nv3');
+  await taoDBCu(file, true);
+  const orm = await moORM(SanPhamDoi2, file, 'nv3');
+  await vongTron(orm);
+  await orm.close(true);
+}
+
+async function nv4() {
+  xoaThuMuc('nv4');
+  const buoi = async (nhan: string, entity: EntityClass<object>) => {
+    console.log(`\n========== ${nhan} ==========`);
+    const orm = await moORM(entity, ':memory:', 'nv4', true);
+    const kq = await orm.migrator.create();
+    console.log('File moi:', kq.fileName || '(khong sinh file)');
+    console.log('up:', kq.diff.up);
+    await orm.close(true);
+    await doi1Giay();
+  };
+  await buoi('SANG: (id, ten)', SanPhamV1);
+  await buoi('CHIEU: them gia', SanPhamV2);
+  await buoi('TOI: khong sua gi', SanPhamV2);
+}
+
+async function nv4Deploy() {
+  const orm = await moORM(SanPhamV2, ':memory:', 'nv4');
+  console.log('Pending:', (await orm.migrator.getPending()).map(m => m.name));
+  try {
+    await orm.migrator.up();
+  } catch (e) {
+    console.log('LOI:', (e as Error).message);
+  }
+  await xem(orm, 'Server sau up()');
+  await orm.close(true);
+}
+
+@Controller('san-pham')
+class SanPhamController {
+  constructor(private readonly em: EntityManager) {}
+
+  @Get('them')
+  async them() {
+    this.em.create(SanPhamV2, { ten: 'But', gia: 5000 });
+    await this.em.flush();
+    return this.em.find(SanPhamV2, {});
+  }
+}
+
+@Module({
+  imports: [
+    MikroOrmModule.forRoot({
+      driver: SqliteDriver,
+      entities: [SanPhamV2],
+      dbName: db('server'),
+      metadataProvider: ReflectMetadataProvider,
+      extensions: [Migrator],
+      migrations: { path: 'dist/bt18/nv4', pathTs: 'src/bt18/nv4' },
+    }),
+  ],
+  controllers: [SanPhamController],
+})
+class AppModule {}
+
+async function nv5(moi: boolean) {
+  if (moi) rmSync(db('server'), { force: true });
+  const app = await NestFactory.create(AppModule, { logger: ['error'] });
+  const orm = app.get(MikroORM);
+  console.log('Pending:', (await orm.migrator.getPending()).map(m => m.name));
+  const daChay = await orm.migrator.up();
+  console.log('up() vua chay:', daChay.map(m => m.name));
+  await app.listen(3000);
+  const res = await fetch('http://localhost:3000/san-pham/them');
+  console.log('Tra ve:', res.status, await res.json());
+  await app.close();
+}
+
+async function nv6() {
+  const file = db('nv6');
+  await taoDBCu(file, true);
+  const orm = await moORM(SanPhamNV6, file, 'nv6');
+  await vongTron(orm);
+  await orm.close(true);
+}
+
+const [lenh, thamSo] = process.argv.slice(2);
+const bang: Record<string, () => Promise<void>> = {
+  nv1,
+  nv2,
+  'nv3-tao': nv3Tao,
+  'nv3-chay': nv3Chay,
+  nv4,
+  'nv4-deploy': nv4Deploy,
+  nv5: () => nv5(thamSo === 'moi'),
+  nv6,
+};
+const chay = bang[lenh];
+if (chay) chay();
+else console.log('Chay: node dist/main.js <lenh>. Lenh:', Object.keys(bang).join(' | '));

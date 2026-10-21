@@ -1,0 +1,353 @@
+// ================================================================
+//  BAI TAP LON — ON TAP BAI 18: MIGRATION
+//  Lam TUNG nhiem vu mot. Xong nhiem vu nao -> gui log cho Claude cham.
+//  Chay: npm run dev -- <lenh>   (vd: npm run dev -- nv1)
+//    -> luon compile truoc khi chay. Bat buoc, vi migrator.up() doc file trong dist/.
+//  Can Node 22: nvm use
+//  Bang dung chung: san_pham. Moi nhiem vu co DB rieng trong thu muc db-bt18/.
+//  Ham co san (khong can sua): db(), moORM(), taoDBCu(), xem(), xoaThuMuc(), doi1Giay().
+// ================================================================
+import 'reflect-metadata';
+import { mkdirSync, rmSync } from 'node:fs';
+import { Controller, Get, Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { MikroORM, EntityManager, SqliteDriver, EntityClass } from '@mikro-orm/sqlite';
+import { Migrator } from '@mikro-orm/migrations';
+import { Entity, PrimaryKey, Property, ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamNV1 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  ten?: string;
+
+  @Property()
+  gia!: number;
+}
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamDoi1 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  tenSp?: string;
+
+  @Property({ nullable: true })
+  moTa?: string;
+}
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamDoi2 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  tenSp?: string;
+
+  @Property({ nullable: true })
+  ghiChu?: string;
+}
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamV1 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  ten?: string;
+}
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamV2 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  ten?: string;
+
+  @Property({ nullable: true })
+  gia?: number;
+}
+
+@Entity({ tableName: 'san_pham' })
+class SanPhamNV6 {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  tenSp?: string;
+
+  @Property({ nullable: true })
+  ghiChu?: string;
+
+  @Property({ default: 0 })
+  gia!: number;
+}
+
+// ================= HAM CO SAN =================
+mkdirSync('db-bt18', { recursive: true });
+const db = (ten: string) => `db-bt18/${ten}.sqlite`;
+
+// thuMuc: file migration nam o src/bt18/<thuMuc>, ban da compile o dist/bt18/<thuMuc>
+// debug = true: in ra moi cau query ORM gui xuong DB
+const moORM = (entity: EntityClass<object>, dbName: string, thuMuc = 'chung', debug = false) =>
+  MikroORM.init({
+    entities: [entity],
+    dbName,
+    metadataProvider: ReflectMetadataProvider,
+    extensions: [Migrator],
+    migrations: { path: `dist/bt18/${thuMuc}`, pathTs: `src/bt18/${thuMuc}` },
+    debug: debug ? ['query'] : false,
+  });
+
+type ORM = Awaited<ReturnType<typeof moORM>>;
+
+const xoaThuMuc = (thuMuc: string) => {
+  rmSync(`src/bt18/${thuMuc}`, { recursive: true, force: true });
+  rmSync(`dist/bt18/${thuMuc}`, { recursive: true, force: true });
+};
+
+const doi1Giay = () => new Promise(r => setTimeout(r, 1100));
+
+// Xoa DB cu, tao lai bang san_pham co 3 dong:
+//   coMoTa = false -> (id, ten)         : But, Vo, Thuoc
+//   coMoTa = true  -> (id, ten, mo_ta)  : But/Viet xanh, Vo/100 trang, Thuoc/30cm
+async function taoDBCu(dbName: string, coMoTa: boolean) {
+  rmSync(dbName, { force: true });
+  const orm = await moORM(SanPhamV1, dbName);
+  const conn = orm.em.getConnection();
+  if (coMoTa) {
+    await conn.execute('create table `san_pham` (`id` integer not null primary key autoincrement, `ten` text null, `mo_ta` text null)');
+    await conn.execute("insert into `san_pham` (`ten`, `mo_ta`) values ('But', 'Viet xanh'), ('Vo', '100 trang'), ('Thuoc', '30cm')");
+  } else {
+    await conn.execute('create table `san_pham` (`id` integer not null primary key autoincrement, `ten` text null)');
+    await conn.execute("insert into `san_pham` (`ten`) values ('But'), ('Vo'), ('Thuoc')");
+  }
+  await orm.close(true);
+}
+
+// In ra: cac cot cua san_pham, cac dong du lieu, so mikro_orm_migrations
+async function xem(orm: ORM, nhan: string) {
+  const conn = orm.em.getConnection();
+  const cot = ((await conn.execute('pragma table_info(san_pham)')) as { name: string }[]).map(c => c.name);
+  const dong = cot.length ? await conn.execute('select * from `san_pham`') : [];
+  let so: string[] | string = 'chua co so';
+  try {
+    so = ((await conn.execute('select `name` from `mikro_orm_migrations`')) as { name: string }[]).map(r => r.name);
+  } catch {}
+  console.log(`\n--- ${nhan} ---`);
+  console.log('Cot :', cot);
+  console.log('Dong:', dong);
+  console.log('So  :', so);
+}
+
+// ================================================================
+//  NHIEM VU 1 — schema.update() va du lieu cu                 (on 18A)
+//  Lenh: npm run dev -- nv1
+//  DB cu: san_pham(id, ten), 3 dong. Entity SanPhamNV1 them `gia` bat buoc, chua co default.
+//  TODO: in ra SQL ORM dinh chay (CHUA chay that).
+//        Roi chay that bang schema.update(), boc try/catch, loi thi in message.
+//  DU DOAN (viet truoc khi chay):
+//    Cau SQL se la: ->
+//    Chay that thi: ->
+//  Thay loi roi thi sua entity SanPhamNV1 (CHI sua decorator) cho chay duoc, chay lai.
+//  YEU CAU cuoi: khong con LOI, ca 3 dong deu co gia = 0.
+//  CAU HOI: neu bang san_pham dang TRONG (0 dong) thi cau SQL ban dau co bi loi khong? ->
+// ================================================================
+async function nv1() {
+  const file = db('nv1');
+  await taoDBCu(file, false);
+  const orm = await moORM(SanPhamNV1, file);
+
+  // TODO
+
+  await xem(orm, 'Sau schema.update()');
+  await orm.close(true);
+}
+
+// ================================================================
+//  NHIEM VU 2 — ORM doan doi ten                              (on 18B, 18C)
+//  Lenh: npm run dev -- nv2
+//  DB cu: san_pham(id, ten, mo_ta), 3 dong.
+//  TODO: mo ORM voi SanPhamDoi1 -> in SQL ORM dinh chay -> close.
+//        Mo ORM voi SanPhamDoi2 -> in SQL ORM dinh chay -> close.
+//        KHONG chay that.
+//  DU DOAN:
+//    SanPhamDoi1 (ten -> tenSp)                   : ->
+//    SanPhamDoi2 (ten -> tenSp, moTa -> ghiChu)   : ->
+//  CAU HOI 1: property `tenSp` thanh ten cot gi trong DB? ->
+//  CAU HOI 2: vi sao 2 lan cho ket qua khac nhau? Lan nao chay that thi mat du lieu? ->
+// ================================================================
+async function nv2() {
+  const file = db('nv2');
+  await taoDBCu(file, true);
+
+  // TODO
+}
+
+// ================================================================
+//  NHIEM VU 3 — create(), sua tay, chay vong tron             (on 18D, 18E, review)
+//  Buoc a: npm run dev -- nv3-tao
+//    TODO trong nv3Tao: sinh file migration, in fileName, diff.up, diff.down.
+//    DU DOAN: file sinh ra co cau rename nao khong? ->
+//    CAU HOI: sau create(), DB nv3 co bi doi khong? ->
+//  Buoc b: viet ham vongTron (o duoi). Chay npm run dev -- nv3-chay, CHUA sua file migration.
+//    DU DOAN du lieu sau up(): ->
+//  Buoc c: mo file src/bt18/nv3/MigrationXXXX.ts, sua ca up() VA down(). Chay lai nv3-chay.
+//  YEU CAU cuoi (buoc c):
+//    - Ca 4 lan xem (0 -> 3) deu con du 3 dong: But/Viet xanh, Vo/100 trang, Thuoc/30cm
+//    - So: chua co so -> [file] -> [] -> [file]
+// ================================================================
+async function nv3Tao() {
+  const file = db('nv3');
+  xoaThuMuc('nv3');
+  await taoDBCu(file, true);
+  const orm = await moORM(SanPhamDoi2, file, 'nv3');
+
+  // TODO
+
+  await orm.close(true);
+}
+
+// TODO: viet ham nay, NV6 dung lai.
+//   xem '0. Ban dau' -> up() -> xem '1. Sau up()' -> down() -> xem '2. Sau down()' -> up() -> xem '3. Sau up() lan 2'
+//   Moi up()/down() boc try/catch rieng: loi thi in 'LOI:' + message roi VAN chay tiep buoc sau.
+async function vongTron(orm: ORM) {
+  // TODO
+}
+
+async function nv3Chay() {
+  const file = db('nv3');
+  await taoDBCu(file, true);
+  const orm = await moORM(SanPhamDoi2, file, 'nv3');
+  await vongTron(orm);
+  await orm.close(true);
+}
+
+// ================================================================
+//  NHIEM VU 4 — snapshot                                      (on 18F)
+//  Buoc a: npm run dev -- nv4
+//    DB la ':memory:' -> moi buoi mo ORM la mot DB TRONG TRON. Khong up() giua cac buoi.
+//    TODO trong ham buoi(): mo ORM (thuMuc 'nv4', debug true) -> create()
+//          -> in fileName (khong co thi in '(khong sinh file)') va diff.up -> close.
+//    DU DOAN:
+//      SANG  (id, ten)     sinh: ->
+//      CHIEU them gia      sinh: ->   (DB van trong, vay co create table khong?)
+//      TOI   khong sua gi  sinh: ->
+//      Buoi nao co cau query doc DB (sqlite_master, pragma)? ->
+//    CAU HOI: neu xoa src/bt18/nv4/.snapshot-memory.json truoc buoi CHIEU,
+//             CHIEU sinh gi? Deploy 2 file do len DB trong thi sao? ->
+//  Buoc b: npm run dev -- nv4-deploy
+//    TODO trong nv4Deploy: in ten cac file pending -> up() (try/catch) -> xem.
+//    YEU CAU: pending 2 file, up() chay ca 2, cot: id, ten, gia.
+// ================================================================
+async function nv4() {
+  xoaThuMuc('nv4');
+  const buoi = async (nhan: string, entity: EntityClass<object>) => {
+    console.log(`\n========== ${nhan} ==========`);
+
+    // TODO
+
+    await doi1Giay();
+  };
+  await buoi('SANG: (id, ten)', SanPhamV1);
+  await buoi('CHIEU: them gia', SanPhamV2);
+  await buoi('TOI: khong sua gi', SanPhamV2);
+}
+
+async function nv4Deploy() {
+  const orm = await moORM(SanPhamV2, ':memory:', 'nv4');
+
+  // TODO
+
+  await orm.close(true);
+}
+
+// ================================================================
+//  NHIEM VU 5 — Server NestJS tu up() luc khoi dong          (on 18G)
+//  Dung lai 2 file migration cua NV4. DB server: db-bt18/server.sqlite, GIU LAI giua cac lan chay.
+//  TODO trong nv5: tao app (logger chi 'error') -> in pending -> up() o DUNG CHO -> in ten file vua chay
+//        -> listen 3000 -> fetch GET http://localhost:3000/san-pham/them -> in status + body -> close app.
+//  Chay 3 lan, moi lan DU DOAN truoc (pending / up() chay file nao / tra ve gi):
+//    Lan 1: npm run dev -- nv5 moi   (xoa DB, server moi tinh)  ->
+//    Lan 2: npm run dev -- nv5       (khoi dong lai, giu DB)     ->
+//    Lan 3: comment dong up() lai, npm run dev -- nv5 moi
+//           Loi gi? Khac loi o 18G cho nao? Vi sao? ->
+//  Xong nho bo comment dong up().
+// ================================================================
+@Controller('san-pham')
+class SanPhamController {
+  constructor(private readonly em: EntityManager) {}
+
+  @Get('them')
+  async them() {
+    this.em.create(SanPhamV2, { ten: 'But', gia: 5000 });
+    await this.em.flush();
+    return this.em.find(SanPhamV2, {});
+  }
+}
+
+@Module({
+  imports: [
+    MikroOrmModule.forRoot({
+      driver: SqliteDriver,
+      entities: [SanPhamV2],
+      dbName: db('server'),
+      metadataProvider: ReflectMetadataProvider,
+      extensions: [Migrator],
+      migrations: { path: 'dist/bt18/nv4', pathTs: 'src/bt18/nv4' },
+    }),
+  ],
+  controllers: [SanPhamController],
+})
+class AppModule {}
+
+async function nv5(moi: boolean) {
+  if (moi) rmSync(db('server'), { force: true });
+
+  // TODO
+}
+
+// ================================================================
+//  NHIEM VU 6 — Review file cua dong nghiep                   (on toan bo bai 18)
+//  Dong nghiep sua entity thanh SanPhamNV6 (ten -> tenSp, moTa -> ghiChu, them gia bat buoc)
+//  va tu viet tay file src/bt18/nv6/Migration20261021120000.ts, nho ban review truoc khi merge.
+//  DB server hien tai: san_pham(id, ten, mo_ta), 3 dong.
+//  Buoc a: CHI DOC file, CHUA chay. File co 3 loi, ghi ra:
+//    1. ->
+//    2. ->
+//    3. ->
+//  Buoc b: npm run dev -- nv6   (dung lai vongTron cua NV3). Log co khop voi 3 loi ban ghi khong?
+//  Buoc c: sua file den khi pass.
+//    Luu y: up() loi giua chung thi ca file bi huy (rollback), nen co the phai sua xong loi nay moi lo ra loi sau.
+//  YEU CAU cuoi:
+//    - Ca 4 lan xem deu con du 3 dong, khong mat mo ta (Viet xanh, 100 trang, 30cm)
+//    - Sau up(): cot id, ten_sp, ghi_chu, gia | Sau down(): ve dung id, ten, mo_ta
+//    - Khong co dong LOI nao
+// ================================================================
+async function nv6() {
+  const file = db('nv6');
+  await taoDBCu(file, true);
+  const orm = await moORM(SanPhamNV6, file, 'nv6');
+  await vongTron(orm);
+  await orm.close(true);
+}
+
+const [lenh, thamSo] = process.argv.slice(2);
+const bang: Record<string, () => Promise<void>> = {
+  nv1,
+  nv2,
+  'nv3-tao': nv3Tao,
+  'nv3-chay': nv3Chay,
+  nv4,
+  'nv4-deploy': nv4Deploy,
+  nv5: () => nv5(thamSo === 'moi'),
+  nv6,
+};
+const chay = bang[lenh];
+if (chay) chay();
+else console.log('Chay: npm run dev -- <lenh>. Lenh:', Object.keys(bang).join(' | '));

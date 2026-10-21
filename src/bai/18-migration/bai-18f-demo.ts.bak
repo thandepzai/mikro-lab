@@ -1,0 +1,158 @@
+// BAI 18F (demo) — snapshot false vs true, deploy that bang migrator.up()
+// node dist/main.js viet     -> snapshot: false, sang create() file A, chieu create() file B
+// node dist/main.js coso     -> snapshot: true, sang / chieu / toi create(), xem so sau moi buoc
+// node dist/main.js email    -> chay sau coso: them email, so voi so cu
+// node dist/main.js xoaso    -> snapshot: true nhung xoa so giua chung
+// tsc && node dist/main.js deploy [true] -> server DB trong, migrator.up()
+import 'reflect-metadata';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { MikroORM } from '@mikro-orm/sqlite';
+import { Migrator } from '@mikro-orm/migrations';
+import { Entity, PrimaryKey, Property, ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+
+// CODE BUOI SANG: chi co name
+@Entity({ tableName: 'khach_hang' })
+class KhachHangSang {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  name?: string;
+}
+
+// CODE BUOI CHIEU: them phone
+@Entity({ tableName: 'khach_hang' })
+class KhachHangChieu {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  name?: string;
+
+  @Property({ nullable: true })
+  phone?: string;
+}
+
+// CODE SANG NAY: them email
+@Entity({ tableName: 'khach_hang' })
+class KhachHangEmail {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  name?: string;
+
+  @Property({ nullable: true })
+  phone?: string;
+
+  @Property({ nullable: true })
+  email?: string;
+}
+
+const SO ='src/demo-18f/.snapshot-memory.json';
+
+const moORM = (entity: typeof KhachHangSang | typeof KhachHangChieu | typeof KhachHangEmail, snapshot: boolean, debug = false) =>
+  MikroORM.init({
+    entities: [entity],
+    dbName: ':memory:',
+    metadataProvider: ReflectMetadataProvider,
+    extensions: [Migrator],
+    migrations: { path: 'dist/demo-18f', pathTs: 'src/demo-18f', snapshot },
+    debug,
+  });
+
+const lamMoi = () => {
+  rmSync('src/demo-18f', { recursive: true, force: true });
+  rmSync('dist/demo-18f', { recursive: true, force: true });
+};
+
+const doiSangGiayMoi = () => new Promise(r => setTimeout(r, 1100));
+
+const docSo = () => {
+  if (!existsSync(SO)) return 'CHUA CO SO';
+  const so: { tables: { name: string; columns: Record<string, unknown> }[] } = JSON.parse(readFileSync(SO, 'utf8'));
+  return so.tables.map(t => `${t.name}(${Object.keys(t.columns).join(', ')})`);
+};
+
+async function taoFile(tieuDe: string, entity: typeof KhachHangSang | typeof KhachHangChieu | typeof KhachHangEmail) {
+  console.log(`\n========== ${tieuDe} ==========`);
+  console.log('So TRUOC create():', docSo());
+  const orm = await moORM(entity, true, true);
+  const kq = await orm.migrator.create();
+  console.log('diff.up:', kq.diff.up);
+  console.log('File moi:', kq.fileName || '(khong sinh file)');
+  console.log('So SAU create():', docSo());
+  await orm.close(true);
+}
+
+async function viet() {
+  lamMoi();
+
+  const sang = await moORM(KhachHangSang, false);
+  console.log('SANG  create() ->', (await sang.migrator.create()).fileName);
+  await sang.close(true);
+
+  await doiSangGiayMoi();
+
+  const chieu = await moORM(KhachHangChieu, false);
+  console.log('CHIEU create() ->', (await chieu.migrator.create()).fileName);
+  await chieu.close(true);
+
+  console.log('Thu muc:', readdirSync('src/demo-18f'));
+}
+
+async function coSo() {
+  lamMoi();
+  await taoFile('SANG: entity (id, name)', KhachHangSang);
+  await doiSangGiayMoi();
+  await taoFile('CHIEU: entity them phone', KhachHangChieu);
+  await doiSangGiayMoi();
+  await taoFile('TOI: khong sua entity, create() lan nua', KhachHangChieu);
+  console.log('\nThu muc:', readdirSync('src/demo-18f'));
+}
+
+async function xoaSo() {
+  lamMoi();
+
+  const sang = await moORM(KhachHangSang, true);
+  console.log('SANG  create() ->', (await sang.migrator.create()).diff.up);
+  await sang.close(true);
+  console.log('Thu muc:', readdirSync('src/demo-18f'));
+
+  rmSync(SO);
+  console.log('--- XOA SO ---', readdirSync('src/demo-18f'));
+  await doiSangGiayMoi();
+
+  const chieu = await moORM(KhachHangChieu, true);
+  console.log('CHIEU create() ->', (await chieu.migrator.create()).diff.up);
+  await chieu.close(true);
+  console.log('Thu muc:', readdirSync('src/demo-18f'));
+}
+
+async function deploy(snapshot: boolean) {
+  const server = await moORM(KhachHangChieu, snapshot, true);
+  const conn = server.em.getConnection();
+
+  console.log('\n--- 1. FILE PENDING ---');
+  console.log(await server.migrator.getPending());
+
+  console.log('\n--- 2. migrator.up() ---');
+  try {
+    await server.migrator.up();
+  } catch (e) {
+    console.log('\nLOI:', (e as Error).message);
+  }
+
+  console.log('\n--- 3. SAU KHI up() ---');
+  console.log('Bang tren server:', await conn.execute("select name from sqlite_master where type = 'table'"));
+  console.log('Cot khach_hang:', (await conn.execute('pragma table_info(khach_hang)')).map((c: { name: string }) => c.name));
+  console.log('So mikro_orm_migrations:', await conn.execute('select `name` from `mikro_orm_migrations`'));
+  await server.close(true);
+}
+
+const [lenh, thamSo] = process.argv.slice(2);
+if (lenh === 'deploy') deploy(thamSo === 'true');
+else if (lenh === 'coso') coSo();
+else if (lenh === 'email') taoFile('SANG NAY: them email (khong xoa thu muc cu)', KhachHangEmail).then(() => console.log('\nThu muc:', readdirSync('src/demo-18f')));
+else if (lenh === 'xoaso') xoaSo();
+else viet();

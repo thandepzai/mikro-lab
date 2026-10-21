@@ -1,0 +1,55 @@
+// BAI 18F — snapshot: true (mac dinh). create() so entity voi cai gi?
+import 'reflect-metadata';
+import { readdirSync } from 'node:fs';
+import { MikroORM } from '@mikro-orm/sqlite';
+import { Migrator } from '@mikro-orm/migrations';
+import { Entity, PrimaryKey, Property, ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+
+@Entity()
+class KhachHang {
+  @PrimaryKey()
+  id!: number;
+
+  @Property({ nullable: true })
+  name?: string;
+
+  @Property({ nullable: true })
+  phone?: string;
+}
+
+async function main() {
+  const orm = await MikroORM.init({
+    entities: [KhachHang],
+    dbName: ':memory:',
+    metadataProvider: ReflectMetadataProvider,
+    extensions: [Migrator],
+    migrations: { path: 'dist/migrations', pathTs: 'src/migrations' },
+    debug: true,
+  });
+  const conn = orm.em.getConnection();
+  const bangTrongDB = () => conn.execute("select name from sqlite_master where type = 'table'");
+
+  // DB TRONG TRON: khong tao bang nao
+  console.log('\n---------- BAT DAU ----------\n');
+  console.log('Bang trong DB:', await bangTrongDB());
+  console.log('Thu muc migrations:', readdirSync('src/migrations'));
+
+  console.log('\n--- 1. create() LAN 1 ---');
+  console.log((await orm.migrator.create()).diff);
+  console.log('Thu muc migrations:', readdirSync('src/migrations'));
+
+  console.log('\n--- 2. create() LAN 2 ---');
+  console.log((await orm.migrator.create()).diff);
+
+  console.log('\n--- 3. KIEM TRA ---');
+  console.log('Bang trong DB:', await bangTrongDB());
+
+  await orm.close(true);
+}
+main();
+
+// KET QUA:
+// create() lan 1: chua co .snapshot-memory.json -> doc DB (select sqlite_master, pragma) -> DB trong -> sinh `create table khach_hang` + ghi snapshot
+// create() lan 2: co snapshot -> KHONG doc DB -> snapshot == entity -> diff { up: [], down: [] }
+// Muc 3: DB van khong co khach_hang (create() khong chay SQL)
+// Doi chung snapshot: false: create() lan 2 lai sinh `create table` lan nua -> 2 file trung, deploy file 2 no
