@@ -23,14 +23,24 @@
 //
 //  Bang dung chung: san_pham. Ban dau luon co 3 dong: But, Vo, Thuoc.
 // ================================================================
-import 'reflect-metadata';
-import { mkdirSync, rmSync } from 'node:fs';
-import { Controller, Get, Module } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { MikroORM, EntityManager, SqliteDriver, EntityClass } from '@mikro-orm/sqlite';
-import { Migrator } from '@mikro-orm/migrations';
-import { Entity, PrimaryKey, Property, ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+import "reflect-metadata";
+import { mkdirSync, rmSync } from "node:fs";
+import { Controller, Get, Module } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { MikroOrmModule } from "@mikro-orm/nestjs";
+import {
+  MikroORM,
+  EntityManager,
+  SqliteDriver,
+  EntityClass,
+} from "@mikro-orm/sqlite";
+import { Migrator } from "@mikro-orm/migrations";
+import {
+  Entity,
+  PrimaryKey,
+  Property,
+  ReflectMetadataProvider,
+} from "@mikro-orm/decorators/legacy";
 
 // ================================================================
 //  B1 — Them cot bat buoc vao bang DA CO du lieu                (on 18A)
@@ -45,7 +55,7 @@ import { Entity, PrimaryKey, Property, ReflectMetadataProvider } from '@mikro-or
 //
 //  VIEC CUA BAN: sua dong <- SUA de het loi va 3 dong cu deu co gia = 0.
 // ================================================================
-@Entity({ tableName: 'san_pham' })
+@Entity({ tableName: "san_pham" })
 class SanPhamB1 {
   @PrimaryKey()
   id!: number;
@@ -61,13 +71,13 @@ async function b1() {
   const orm = await moORM(SanPhamB1);
   await taoBangCu(orm, false);
 
-  console.log('SQL ORM sinh ra:', await orm.schema.getUpdateSchemaSQL());
+  console.log("SQL ORM sinh ra:", await orm.schema.getUpdateSchemaSQL());
   try {
     await orm.schema.update();
   } catch (e) {
-    console.log('LOI:', (e as Error).message);
+    console.log("LOI:", (e as Error).message);
   }
-  await xem(orm, 'Sau schema.update()');
+  await xem(orm, "Sau schema.update()");
   await orm.close(true);
 }
 
@@ -86,7 +96,7 @@ async function b1() {
 //    3. Lan 2 ORM sinh SQL gi? Du lieu con khong?     ->
 //    4. Vi sao 2 lan khac nhau?                       ->
 // ================================================================
-@Entity({ tableName: 'san_pham' })
+@Entity({ tableName: "san_pham" })
 class DoiTen1Cot {
   @PrimaryKey()
   id!: number;
@@ -98,7 +108,7 @@ class DoiTen1Cot {
   moTa?: string;
 }
 
-@Entity({ tableName: 'san_pham' })
+@Entity({ tableName: "san_pham" })
 class DoiTen2Cot {
   @PrimaryKey()
   id!: number;
@@ -111,13 +121,16 @@ class DoiTen2Cot {
 }
 
 async function b2() {
-  for (const [nhan, entity] of [['Lan 1: doi 1 cot', DoiTen1Cot], ['Lan 2: doi 2 cot', DoiTen2Cot]] as const) {
+  for (const [nhan, entity] of [
+    ["Lan 1: doi 1 cot", DoiTen1Cot],
+    ["Lan 2: doi 2 cot", DoiTen2Cot],
+  ] as const) {
     console.log(`\n========== ${nhan} ==========`);
     const orm = await moORM(entity);
     await taoBangCu(orm, true);
-    console.log('SQL ORM sinh ra:', await orm.schema.getUpdateSchemaSQL());
+    console.log("SQL ORM sinh ra:", await orm.schema.getUpdateSchemaSQL());
     await orm.schema.update();
-    await xem(orm, 'Sau schema.update()');
+    await xem(orm, "Sau schema.update()");
     await orm.close(true);
   }
 }
@@ -132,22 +145,21 @@ async function b2() {
 //  File sinh ra o: src/bt18/b3/MigrationXXXX.ts — mo ra doc.
 //
 //  DOAN TRUOC KHI SUA — code dang nhu nay, chay thi ra gi? co loi gi?
-//    1. up() trong file co cau rename nao khong?        ->
-//    2. Sau create(), DB co bi doi khong?               ->
+//    1. up() trong file co cau rename nao khong?        -> Không, chỉ có drop ten, drop mo_ta rồi add ten_sp, ghi_chu (chạy up() là mất data 2 cột cũ)
+//    2. Sau create(), DB co bi doi khong?               -> Không, create() chỉ ghi file, DB và sổ mikro_orm_migrations vẫn nguyên
 //
 //  Chu y: moi lan chay b3 se XOA file cu va sinh file moi (mat luon phan ban sua o B5).
 // ================================================================
 async function b3() {
-  xoaThuMuc('b3');
-  const orm = await moORM(DoiTen2Cot, { thuMuc: 'b3' });
+  xoaThuMuc("b3");
+  const orm = await moORM(DoiTen2Cot, { thuMuc: "b3" });
   await taoBangCu(orm, true);
 
   const kq = await orm.migrator.create();
-  console.log('File vua sinh:', kq.fileName);
-  console.log('up()  :', kq.diff.up);
-  console.log('down():', kq.diff.down);
-
-  await xem(orm, 'DB sau create()');
+  console.log("File vua sinh:", kq.fileName);
+  console.log("up()  :", kq.diff.up);
+  console.log("down():", kq.diff.down);
+  await xem(orm, "DB sau create()");
   await orm.close(true);
 }
 
@@ -165,7 +177,7 @@ async function b3() {
 //    3. Sau down(): so ra sao? du lieu quay ve khong?   ->
 // ================================================================
 async function b4() {
-  const orm = await moORM(DoiTen2Cot, { thuMuc: 'b3' });
+  const orm = await moORM(DoiTen2Cot, { thuMuc: "b3" });
   await taoBangCu(orm, true);
   await vongTron(orm);
   await orm.close(true);
@@ -183,6 +195,8 @@ async function b4() {
 //  YEU CAU: ca 4 lan xem deu con du But/Viet xanh, Vo/100 trang, Thuoc/30cm.
 // ================================================================
 
+
+
 // ================================================================
 //  B6 — Snapshot                                                (on 18F)
 //  Lenh: npm run dev -- b6          (dev sinh file 3 buoi)
@@ -195,18 +209,18 @@ async function b4() {
 //  b6-deploy phai la lenh rieng vi up() doc file da compile trong dist/.
 //
 //  DOAN TRUOC KHI SUA (DUNG_SNAPSHOT = true) — chay thi ra gi? co loi gi?
-//    1. SANG sinh gi?                                  ->
-//    2. CHIEU sinh gi? (DB van trong!)                 ->
-//    3. TOI sinh gi?                                   ->
-//    4. b6-deploy: up() co chay duoc ca 2 file khong?  ->
+//    1. SANG sinh gi?                                  -> create table san_pham (id, ten)
+//    2. CHIEU sinh gi? (DB van trong!)                 -> chi add column gia (so sanh voi snapshot SANG, khong tao lai ca bang)
+//    3. TOI sinh gi?                                   -> khong sinh file, up() rong (snapshot da khop entity)
+//    4. b6-deploy: up() co chay duoc ca 2 file khong?  -> Chạy được cả 2 file SANG + CHIEU, bảng ra id, ten, gia (0 dòng); TOI không có file nên không chạy
 //
 //  VIEC CUA BAN: doi DUNG_SNAPSHOT = false, chay lai b6 roi b6-deploy.
-//    5. CHIEU sinh gi? b6-deploy loi gi? Vi sao?       ->
+//    5. CHIEU sinh gi? b6-deploy loi gi? Vi sao?       -> CHIEU (va TOI) deu sinh lai create table day du (id, ten, gia). b6-deploy loi "table san_pham already exists" o file thu 2, ca dot up() bi huy, DB khong con bang, so trong. Vi khong co snapshot nen migrator so entity voi DB trong va buoi nao cung tuong phai tao bang tu dau.
 //  Xong nho doi lai true va chay lai b6 (B7 dung file cua B6).
 // ================================================================
 const DUNG_SNAPSHOT = true; // <- SUA
 
-@Entity({ tableName: 'san_pham' })
+@Entity({ tableName: "san_pham" })
 class SanPhamSang {
   @PrimaryKey()
   id!: number;
@@ -215,7 +229,7 @@ class SanPhamSang {
   ten?: string;
 }
 
-@Entity({ tableName: 'san_pham' })
+@Entity({ tableName: "san_pham" })
 class SanPhamChieu {
   @PrimaryKey()
   id!: number;
@@ -228,28 +242,41 @@ class SanPhamChieu {
 }
 
 async function b6() {
-  xoaThuMuc('b6');
-  for (const [nhan, entity] of [['SANG', SanPhamSang], ['CHIEU', SanPhamChieu], ['TOI', SanPhamChieu]] as const) {
+  xoaThuMuc("b6");
+  for (const [nhan, entity] of [
+    ["SANG", SanPhamSang],
+    ["CHIEU", SanPhamChieu],
+    ["TOI", SanPhamChieu],
+  ] as const) {
     console.log(`\n========== ${nhan} ==========`);
-    const orm = await moORM(entity, { thuMuc: 'b6', snapshot: DUNG_SNAPSHOT });
+    const orm = await moORM(entity, { thuMuc: "b6", snapshot: DUNG_SNAPSHOT });
     const kq = await orm.migrator.create();
-    console.log('File vua sinh:', kq.fileName || '(khong sinh file)');
-    console.log('up():', kq.diff.up);
+    console.log("File vua sinh:", kq.fileName || "(khong sinh file)");
+    console.log("up():", kq.diff.up);
     await orm.close(true);
     await doi1Giay();
   }
 }
 
 async function b6Deploy() {
-  const orm = await moORM(SanPhamChieu, { thuMuc: 'b6', snapshot: DUNG_SNAPSHOT });
-  console.log('File cho chay:', (await orm.migrator.getPending()).map(m => m.name));
+  const orm = await moORM(SanPhamChieu, {
+    thuMuc: "b6",
+    snapshot: DUNG_SNAPSHOT,
+  });
+  console.log(
+    "File cho chay:",
+    (await orm.migrator.getPending()).map((m) => m.name),
+  );
   try {
     const daChay = await orm.migrator.up();
-    console.log('up() da chay:', daChay.map(m => m.name));
+    console.log(
+      "up() da chay:",
+      daChay.map((m) => m.name),
+    );
   } catch (e) {
-    console.log('LOI:', (e as Error).message);
+    console.log("LOI:", (e as Error).message);
   }
-  await xem(orm, 'Server sau up()');
+  await xem(orm, "Server sau up()");
   await orm.close(true);
 }
 
@@ -259,22 +286,22 @@ async function b6Deploy() {
 //  Server: khoi dong -> up() -> listen -> goi GET /san-pham/them 1 lan.
 //
 //  DOAN TRUOC KHI SUA (moi lan: file cho chay / up() chay gi / tra ve gi / co loi gi?):
-//    Lan 1: npm run dev -- b7 moi    (xoa DB, server moi)    ->
-//    Lan 2: npm run dev -- b7        (khoi dong lai, giu DB) ->
+//    Lan 1: npm run dev -- b7 moi    (xoa DB, server moi)    -> file cho chay: 2 file (SANG, CHIEU); up() chay ca 2 -> tao bang san_pham (id, ten, gia); tra ve 200, 1 dong But 5000, khong loi.
+//    Lan 2: npm run dev -- b7        (khoi dong lai, giu DB) -> file cho chay: [] (so da ghi 2 file); up() khong chay gi; tra ve 200, 2 dong But 5000 (dong cu + dong moi them), khong loi.
 //
 //  VIEC CUA BAN: doi CHAY_UP = false, chay  npm run dev -- b7 moi
-//    Lan 3: loi gi? Vi sao?                                  ->
+//    Lan 3: loi gi? Vi sao?                                  -> file cho chay van la 2 file nhung khong ai goi up() nen bang san_pham khong duoc tao. Server van khoi dong binh thuong, den luc GET /san-pham/them moi tra 500 "no such table: san_pham".
 //  Xong nho doi lai true.
 // ================================================================
 const CHAY_UP = true; // <- SUA
 
-@Controller('san-pham')
+@Controller("san-pham")
 class SanPhamController {
   constructor(private readonly em: EntityManager) {}
 
-  @Get('them')
+  @Get("them")
   async them() {
-    this.em.create(SanPhamChieu, { ten: 'But', gia: 5000 });
+    this.em.create(SanPhamChieu, { ten: "But", gia: 5000 });
     await this.em.flush();
     return this.em.find(SanPhamChieu, {});
   }
@@ -285,10 +312,10 @@ class SanPhamController {
     MikroOrmModule.forRoot({
       driver: SqliteDriver,
       entities: [SanPhamChieu],
-      dbName: 'db-bt18/server.sqlite',
+      dbName: "db-bt18/server.sqlite",
       metadataProvider: ReflectMetadataProvider,
       extensions: [Migrator],
-      migrations: { path: 'dist/bt18/b6', pathTs: 'src/bt18/b6' },
+      migrations: { path: "dist/bt18/b6", pathTs: "src/bt18/b6" },
     }),
   ],
   controllers: [SanPhamController],
@@ -296,19 +323,25 @@ class SanPhamController {
 class AppModule {}
 
 async function b7(moi: boolean) {
-  if (moi) rmSync('db-bt18/server.sqlite', { force: true });
+  if (moi) rmSync("db-bt18/server.sqlite", { force: true });
 
-  const app = await NestFactory.create(AppModule, { logger: ['error'] });
+  const app = await NestFactory.create(AppModule, { logger: ["error"] });
   const orm = app.get(MikroORM);
-  console.log('File cho chay:', (await orm.migrator.getPending()).map(m => m.name));
+  console.log(
+    "File cho chay:",
+    (await orm.migrator.getPending()).map((m) => m.name),
+  );
   if (CHAY_UP) {
     const daChay = await orm.migrator.up();
-    console.log('up() da chay:', daChay.map(m => m.name));
+    console.log(
+      "up() da chay:",
+      daChay.map((m) => m.name),
+    );
   }
   await app.listen(3000);
 
-  const res = await fetch('http://localhost:3000/san-pham/them');
-  console.log('Tra ve:', res.status, await res.json());
+  const res = await fetch("http://localhost:3000/san-pham/them");
+  console.log("Tra ve:", res.status, await res.json());
   await app.close();
 }
 
@@ -321,9 +354,9 @@ async function b7(moi: boolean) {
 //  DB server: san_pham(id, ten, mo_ta) — 3 dong.
 //
 //  Buoc 1: CHI DOC file, chua chay. Tim 3 loi. Goi y — hoi 3 cau:
-//    - Co `not null` khong? 3 dong cu se dien gi?        -> loi 1:
-//    - Co `drop` khong? Du lieu cot do di dau?           -> loi 2:
-//    - down() co tra DB ve DUNG nhu cu khong?            -> loi 3:
+//    - Co `not null` khong? 3 dong cu se dien gi?        -> loi 1: Có. `gia integer not null` không có default nên 3 dòng cũ không có giá trị để điền, up() lỗi và cả file bị huỷ. Sửa: thêm default 0.
+//    - Co `drop` khong? Du lieu cot do di dau?           -> loi 2: Có. up() drop mo_ta rồi add ghi_chu mới (null), mô tả cũ (Viet xanh, 100 trang, 30cm) mất hẳn. Sửa: rename mo_ta -> ghi_chu.
+//    - down() co tra DB ve DUNG nhu cu khong?            -> loi 3: Không. down() cũng drop ghi_chu rồi add mo_ta mới (null) nên không khôi phục được dữ liệu, và còn thiếu rename ten_sp -> ten nên sau down() cột vẫn là ten_sp. Sửa: 2 câu rename ngược lại.
 //  Buoc 2: chay b8, xem log co dung loi ban tim khong.
 //  Buoc 3: sua file, chay lai den khi pass.
 //    (up() loi giua chung la ca file bi huy, nen sua xong loi nay moi lo loi sau)
@@ -333,7 +366,7 @@ async function b7(moi: boolean) {
 //    - Sau up(): cot id, ten_sp, ghi_chu, gia — Sau down(): ve dung id, ten, mo_ta
 //    - Khong co dong LOI nao
 // ================================================================
-@Entity({ tableName: 'san_pham' })
+@Entity({ tableName: "san_pham" })
 class SanPhamB8 {
   @PrimaryKey()
   id!: number;
@@ -349,7 +382,7 @@ class SanPhamB8 {
 }
 
 async function b8() {
-  const orm = await moORM(SanPhamB8, { thuMuc: 'b8' });
+  const orm = await moORM(SanPhamB8, { thuMuc: "b8" });
   await taoBangCu(orm, true);
   await vongTron(orm);
   await orm.close(true);
@@ -364,13 +397,20 @@ interface TuyChon {
   snapshot?: boolean;
 }
 
-function moORM(entity: EntityClass<object>, { dbName = ':memory:', thuMuc = 'chung', snapshot = false }: TuyChon = {}) {
+function moORM(
+  entity: EntityClass<object>,
+  { dbName = ":memory:", thuMuc = "chung", snapshot = false }: TuyChon = {},
+) {
   return MikroORM.init({
     entities: [entity],
     dbName,
     metadataProvider: ReflectMetadataProvider,
     extensions: [Migrator],
-    migrations: { path: `dist/bt18/${thuMuc}`, pathTs: `src/bt18/${thuMuc}`, snapshot },
+    migrations: {
+      path: `dist/bt18/${thuMuc}`,
+      pathTs: `src/bt18/${thuMuc}`,
+      snapshot,
+    },
   });
 }
 
@@ -379,42 +419,62 @@ type ORM = Awaited<ReturnType<typeof moORM>>;
 async function taoBangCu(orm: ORM, coMoTa: boolean) {
   const conn = orm.em.getConnection();
   if (coMoTa) {
-    await conn.execute('create table `san_pham` (`id` integer not null primary key autoincrement, `ten` text null, `mo_ta` text null)');
-    await conn.execute("insert into `san_pham` (`ten`, `mo_ta`) values ('But', 'Viet xanh'), ('Vo', '100 trang'), ('Thuoc', '30cm')");
+    await conn.execute(
+      "create table `san_pham` (`id` integer not null primary key autoincrement, `ten` text null, `mo_ta` text null)",
+    );
+    await conn.execute(
+      "insert into `san_pham` (`ten`, `mo_ta`) values ('But', 'Viet xanh'), ('Vo', '100 trang'), ('Thuoc', '30cm')",
+    );
   } else {
-    await conn.execute('create table `san_pham` (`id` integer not null primary key autoincrement, `ten` text null)');
-    await conn.execute("insert into `san_pham` (`ten`) values ('But'), ('Vo'), ('Thuoc')");
+    await conn.execute(
+      "create table `san_pham` (`id` integer not null primary key autoincrement, `ten` text null)",
+    );
+    await conn.execute(
+      "insert into `san_pham` (`ten`) values ('But'), ('Vo'), ('Thuoc')",
+    );
   }
 }
 
 async function xem(orm: ORM, nhan: string) {
   const conn = orm.em.getConnection();
-  const cot = ((await conn.execute('pragma table_info(san_pham)')) as { name: string }[]).map(c => c.name);
-  let so: string[] | string = '(chua co bang so)';
+  const cot = (
+    (await conn.execute("pragma table_info(san_pham)")) as { name: string }[]
+  ).map((c) => c.name);
+  let so: string[] | string = "(chua co bang so)";
   try {
-    so = ((await conn.execute('select `name` from `mikro_orm_migrations`')) as { name: string }[]).map(r => r.name);
+    so = (
+      (await conn.execute("select `name` from `mikro_orm_migrations`")) as {
+        name: string;
+      }[]
+    ).map((r) => r.name);
   } catch {}
   console.log(`\n--- ${nhan} ---`);
-  console.log('Cot:', cot.length ? cot.join(', ') : '(chua co bang san_pham)');
-  const dong = cot.length ? await conn.execute('select * from `san_pham`') : [];
+  console.log("Cot:", cot.length ? cot.join(", ") : "(chua co bang san_pham)");
+  const dong = cot.length ? await conn.execute("select * from `san_pham`") : [];
   if (dong.length) console.table(dong);
-  else if (cot.length) console.log('Dong: (bang trong)');
-  console.log('So :', so);
+  else if (cot.length) console.log("Dong: (bang trong)");
+  console.log("So :", so);
 }
 
 async function vongTron(orm: ORM) {
-  const buoc = async (nhan: string, chay: () => Promise<{ name: string }[]>) => {
+  const buoc = async (
+    nhan: string,
+    chay: () => Promise<{ name: string }[]>,
+  ) => {
     try {
-      console.log(`\n>>> ${nhan} da chay:`, (await chay()).map(m => m.name));
+      console.log(
+        `\n>>> ${nhan} da chay:`,
+        (await chay()).map((m) => m.name),
+      );
     } catch (e) {
       console.log(`\n>>> ${nhan} LOI:`, (e as Error).message);
     }
     await xem(orm, `Sau ${nhan}`);
   };
-  await xem(orm, 'Ban dau');
-  await buoc('up()', () => orm.migrator.up());
-  await buoc('up() lan 2', () => orm.migrator.up());
-  await buoc('down()', () => orm.migrator.down());
+  await xem(orm, "Ban dau");
+  await buoc("up()", () => orm.migrator.up());
+  await buoc("up() lan 2", () => orm.migrator.up());
+  await buoc("down()", () => orm.migrator.down());
 }
 
 function xoaThuMuc(thuMuc: string) {
@@ -423,10 +483,10 @@ function xoaThuMuc(thuMuc: string) {
 }
 
 function doi1Giay() {
-  return new Promise(r => setTimeout(r, 1100));
+  return new Promise((r) => setTimeout(r, 1100));
 }
 
-mkdirSync('db-bt18', { recursive: true });
+mkdirSync("db-bt18", { recursive: true });
 const [lenh, thamSo] = process.argv.slice(2);
 const bang: Record<string, () => Promise<void>> = {
   b1,
@@ -434,10 +494,14 @@ const bang: Record<string, () => Promise<void>> = {
   b3,
   b4,
   b6,
-  'b6-deploy': b6Deploy,
-  b7: () => b7(thamSo === 'moi'),
+  "b6-deploy": b6Deploy,
+  b7: () => b7(thamSo === "moi"),
   b8,
 };
 const chay = bang[lenh];
 if (chay) chay();
-else console.log('Chay: npm run dev -- <lenh>. Lenh:', Object.keys(bang).join(' | '));
+else
+  console.log(
+    "Chay: npm run dev -- <lenh>. Lenh:",
+    Object.keys(bang).join(" | "),
+  );
