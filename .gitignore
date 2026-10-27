@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.sqlite
 db-bt18/
+.env
+*.tsbuildinfo
