@@ -1,0 +1,40 @@
+// BAI 20E — Result cache: cung 1 query, goi 2 lan
+// DOAN TRUOC KHI CHAY: A) 2 lan find khong cache -> bao nhieu "select"? B) 2 lan find co cache: 10000 -> bao nhieu "select"? ->
+import "reflect-metadata";
+import { MikroORM } from "@mikro-orm/sqlite";
+import { ReflectMetadataProvider } from "@mikro-orm/decorators/legacy";
+import { User } from "./entities/User";
+import { Post } from "./entities/Post";
+import { Comment } from "./entities/Comment";
+
+async function main() {
+  let soSelect = 0;
+  const orm = await MikroORM.init({
+    entities: [User, Post, Comment],
+    dbName: ":memory:",
+    metadataProvider: ReflectMetadataProvider,
+    debug: ["query"],
+    logger: (msg) => {
+      if (msg.includes("select")) soSelect++;
+    },
+  });
+  await orm.schema.create();
+
+  const em = orm.em.fork();
+  em.create(User, { name: "An", email: "an@example.com" });
+  await em.flush();
+
+  soSelect = 0;
+  await orm.em.fork().find(User, {});
+  await orm.em.fork().find(User, {});
+  console.log("A) khong cache, so select:", soSelect);
+
+  soSelect = 0;
+  await orm.em.fork().find(User, {}, { cache: 10000 });
+  await orm.em.fork().find(User, {}, { cache: 10000 });
+  console.log("B) co cache 10000ms, so select:", soSelect);
+
+  await orm.close(true);
+}
+
+main();

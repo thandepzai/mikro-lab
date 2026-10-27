@@ -1,0 +1,65 @@
+// BAI 19G — Test service NestJS: dua em cua test vao service bang Test.createTestingModule
+// DOAN TRUOC KHI CHAY: 2 test co xanh het khong? Test thu 2 dem ra may user? ->
+import "reflect-metadata";
+import assert from "node:assert/strict";
+import { after, afterEach, before, beforeEach, test } from "node:test";
+import { Injectable } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+import { MikroORM, EntityManager } from "@mikro-orm/sqlite";
+import { ReflectMetadataProvider } from "@mikro-orm/decorators/legacy";
+import { User } from "./entities/User";
+import { Post } from "./entities/Post";
+import { Comment } from "./entities/Comment";
+import { taoBangVaSeed } from "./orm";
+
+@Injectable()
+class UserService {
+  constructor(private readonly em: EntityManager) {}
+
+  async taoMoi() {
+    this.em.create(User, { name: "Moi", email: "moi@example.com" });
+    await this.em.flush();
+  }
+}
+
+const khoiTao = () =>
+  MikroORM.init({
+    entities: [User, Post, Comment],
+    dbName: ":memory:",
+    metadataProvider: ReflectMetadataProvider,
+  });
+
+let orm: Awaited<ReturnType<typeof khoiTao>>;
+let em: typeof orm.em;
+let service: UserService;
+
+before(async () => {
+  orm = await khoiTao();
+  await taoBangVaSeed(orm);
+});
+
+after(async () => {
+  await orm.close(true);
+});
+
+beforeEach(async () => {
+  em = orm.em.fork();
+  await em.begin();
+  const module = await Test.createTestingModule({
+    providers: [UserService, { provide: EntityManager, useValue: em }],
+  }).compile();
+  service = module.get(UserService);
+});
+
+afterEach(async () => {
+  await em.rollback();
+});
+
+test("service.taoMoi() them user thi co 4 user", async () => {
+  await service.taoMoi();
+  assert.equal(await em.count(User), 4);
+});
+
+test("test sau van thay 3 user", async () => {
+  assert.equal(await em.count(User), 3);
+});

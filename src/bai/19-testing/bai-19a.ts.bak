@@ -1,0 +1,41 @@
+// BAI 19A — Test dung chung 1 DB
+// DOAN TRUOC KHI CHAY: test 1 va test 2 cai nao do, cai nao xanh? ->
+import "reflect-metadata";
+import assert from "node:assert/strict";
+import { after, before, test } from "node:test";
+import { MikroORM } from "@mikro-orm/sqlite";
+import { ReflectMetadataProvider } from "@mikro-orm/decorators/legacy";
+import { User } from "./entities/User";
+import { Post } from "./entities/Post";
+import { Comment } from "./entities/Comment";
+import { taoBangVaSeed } from "./orm";
+
+const khoiTao = () =>
+  MikroORM.init({
+    entities: [User, Post, Comment],
+    dbName: ":memory:",
+    metadataProvider: ReflectMetadataProvider,
+  });
+
+let orm: Awaited<ReturnType<typeof khoiTao>>;
+
+before(async () => {
+  orm = await khoiTao();
+  await taoBangVaSeed(orm);
+});
+
+after(async () => {
+  await orm.close(true);
+});
+
+test("DB vua seed thi co 3 user", async () => {
+  const em = orm.em.fork();
+  assert.equal(await em.count(User), 3);
+});
+
+test("tao them user Moi thi co 4 user", async () => {
+  const em = orm.em.fork();
+  em.create(User, { name: "Moi", email: "moi@example.com" });
+  await em.flush();
+  assert.equal(await em.count(User), 4);
+});

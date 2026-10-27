@@ -1,0 +1,18 @@
+// BAI 20A — Partial loading: chi lay cot can dung
+// DOAN TRUOC KHI CHAY: cau select thu 1 va thu 2 lay nhung cot nao? Cau thu 2 co lay cot email khong? ->
+import { run } from "./orm";
+import { User } from "./entities/User";
+
+run(async (em) => {
+  console.log("--- SAP GOI find day du ---");
+  const dayDu = await em.find(User, {});
+  console.log("--- XONG ---");
+  console.log(dayDu.map((u) => u.name));
+
+  // em.clear();
+
+  console.log("--- SAP GOI find voi fields: ['name'] ---");
+  const mot = await em.find(User, {}, { fields: ["name"] });
+  console.log("--- XONG ---");
+  console.log(mot.map((u) => u));
+});

@@ -1,0 +1,59 @@
+// BAI 19D — Do toc do: dung lai DB moi test (19B) vs rollback (19C)
+// DOAN TRUOC KHI CHAY: 200 lan moi cach, cach nao nhanh hon va nhanh gap may lan? ->
+import "reflect-metadata";
+import { MikroORM } from "@mikro-orm/sqlite";
+import { ReflectMetadataProvider } from "@mikro-orm/decorators/legacy";
+import { User } from "./entities/User";
+import { Post } from "./entities/Post";
+import { Comment } from "./entities/Comment";
+import { taoBangVaSeed } from "./orm";
+
+const SO_LAN = 200;
+
+const khoiTao = () =>
+  MikroORM.init({
+    entities: [User, Post, Comment],
+    dbName: ":memory:",
+    metadataProvider: ReflectMetadataProvider,
+  });
+
+async function dungLaiMoiLan(): Promise<number> {
+  const batDau = performance.now();
+  for (let i = 0; i < SO_LAN; i++) {
+    const orm = await khoiTao();
+    await taoBangVaSeed(orm);
+    const em = orm.em.fork();
+    em.create(User, { name: "Moi", email: "moi@example.com" });
+    await em.flush();
+    await em.count(User);
+    await orm.close(true);
+  }
+  return performance.now() - batDau;
+}
+
+async function rollbackMoiLan(): Promise<number> {
+  const orm = await khoiTao();
+  await taoBangVaSeed(orm);
+  const batDau = performance.now();
+  for (let i = 0; i < SO_LAN; i++) {
+    const em = orm.em.fork();
+    await em.begin();
+    em.create(User, { name: "Moi", email: "moi@example.com" });
+    await em.flush();
+    await em.count(User);
+    await em.rollback();
+  }
+  const tong = performance.now() - batDau;
+  await orm.close(true);
+  return tong;
+}
+
+async function main() {
+  const a = await dungLaiMoiLan();
+  const b = await rollbackMoiLan();
+  console.log(`dung lai DB moi lan : ${a.toFixed(0)} ms`);
+  console.log(`rollback moi lan    : ${b.toFixed(0)} ms`);
+  console.log(`rollback nhanh gap  : ${(a / b).toFixed(1)} lan`);
+}
+
+main();

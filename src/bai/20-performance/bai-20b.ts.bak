@@ -1,0 +1,35 @@
+// BAI 20B — Batch insert: tao 1000 user, flush 1 lan
+// DOAN TRUOC KHI CHAY: 1000 user -> co bao nhieu cau "insert into user"? 1, 4, 1000 hay so khac? ->
+import "reflect-metadata";
+import { MikroORM } from "@mikro-orm/sqlite";
+import { ReflectMetadataProvider } from "@mikro-orm/decorators/legacy";
+import { User } from "./entities/User";
+import { Post } from "./entities/Post";
+import { Comment } from "./entities/Comment";
+
+const SO_USER = 1000;
+
+async function main() {
+  const cacCauInsert: string[] = [];
+  const orm = await MikroORM.init({
+    entities: [User, Post, Comment],
+    dbName: ":memory:",
+    metadataProvider: ReflectMetadataProvider,
+    debug: ["query"],
+    logger: (msg) => {
+      if (msg.includes("insert into `user`")) cacCauInsert.push(msg);
+    },
+  });
+  await orm.schema.create();
+
+  const em = orm.em.fork();
+  for (let i = 0; i < SO_USER; i++) {
+    em.create(User, { name: `User ${i}`, email: `u${i}@example.com` });
+  }
+  await em.flush();
+
+  console.log("so cau insert vao user:", cacCauInsert.length);
+  await orm.close(true);
+}
+
+main();

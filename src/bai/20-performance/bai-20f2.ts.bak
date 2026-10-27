@@ -1,0 +1,37 @@
+// BAI 20F2 — Xoa cache sau khi them user
+// DOAN TRUOC KHI CHAY: sau khi them Binh va goi clearCache, find co cache lan 2 tra ve may user? ->
+import "reflect-metadata";
+import { MikroORM } from "@mikro-orm/sqlite";
+import { ReflectMetadataProvider } from "@mikro-orm/decorators/legacy";
+import { User } from "./entities/User";
+import { Post } from "./entities/Post";
+import { Comment } from "./entities/Comment";
+
+async function main() {
+  const orm = await MikroORM.init({
+    entities: [User, Post, Comment],
+    dbName: ":memory:",
+    metadataProvider: ReflectMetadataProvider,
+  });
+  await orm.schema.create();
+
+  const em = orm.em.fork();
+  em.create(User, { name: "An", email: "an@example.com" });
+  await em.flush();
+
+  const truoc = await orm.em.fork().find(User, {}, { cache: ["ds-user", 10000] });
+  console.log("find co cache (truoc khi them):", truoc.length);
+
+  const emThem = orm.em.fork();
+  emThem.create(User, { name: "Binh", email: "binh@example.com" });
+  await emThem.flush();
+
+  await orm.em.fork().clearCache("ds-user");
+
+  const lan2CoCache = await orm.em.fork().find(User, {}, { cache: ["ds-user", 10000] });
+  console.log("C) find co cache lan 2:", lan2CoCache.length);
+
+  await orm.close(true);
+}
+
+main();

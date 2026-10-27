@@ -1,0 +1,51 @@
+// BAI 19E — Rollback khong cuu duoc khi service tu dung em rieng
+// DOAN TRUOC KHI CHAY: voi moi truong hop A va B, "count sau rollback" in ra 3 hay 4? ->
+import "reflect-metadata";
+import { MikroORM } from "@mikro-orm/sqlite";
+import { ReflectMetadataProvider } from "@mikro-orm/decorators/legacy";
+import { User } from "./entities/User";
+import { Post } from "./entities/Post";
+import { Comment } from "./entities/Comment";
+import { taoBangVaSeed } from "./orm";
+
+const khoiTao = () =>
+  MikroORM.init({
+    entities: [User, Post, Comment],
+    dbName: ":memory:",
+    metadataProvider: ReflectMetadataProvider,
+  });
+
+type Orm = Awaited<ReturnType<typeof khoiTao>>;
+
+async function taoUserTrongTransactional(em: Orm["em"]) {
+  await em.transactional(async (tem) => {
+    tem.create(User, { name: "Moi", email: "moi@example.com" });
+  });
+}
+
+async function taoUserBangEmRieng(orm: Orm) {
+  const em = orm.em.fork();
+  em.create(User, { name: "Moi", email: "moi@example.com" });
+  await em.flush();
+}
+
+async function main() {
+  const orm = await khoiTao();
+  await taoBangVaSeed(orm);
+  orm.config.set("debug", ["query"]);
+  const kiemTra = async (ten: string, fn: (em: Orm["em"]) => Promise<void>) => {
+    console.log(`\n===== ${ten} =====`);
+    const em = orm.em.fork();
+    await em.begin();
+    await Promise.race([
+      fn(em),
+      new Promise((_, rj) => setTimeout(() => rj(new Error("KET (timeout 2s)")), 2000)),
+    ]).catch((e) => console.log("LOI:", e.message));
+    await em.rollback().catch((e) => console.log("rollback loi:", e.message));
+    console.log("count sau rollback:", await orm.em.fork().count(User));
+  };
+  await kiemTra("A: service dung em.transactional(em)", taoUserTrongTransactional);
+  await kiemTra("B: service tu fork em rieng", () => taoUserBangEmRieng(orm));
+  await orm.close(true);
+}
+main();

@@ -1,0 +1,38 @@
+// BAI 20C — flush() nam TRONG vong lap
+// DOAN TRUOC KHI CHAY: 1000 user, moi user flush 1 lan -> bao nhieu "insert into user", bao nhieu "begin"? ->
+import "reflect-metadata";
+import { MikroORM } from "@mikro-orm/sqlite";
+import { ReflectMetadataProvider } from "@mikro-orm/decorators/legacy";
+import { User } from "./entities/User";
+import { Post } from "./entities/Post";
+import { Comment } from "./entities/Comment";
+
+const SO_USER = 1000;
+
+async function main() {
+  let soInsert = 0;
+  let soBegin = 0;
+  const orm = await MikroORM.init({
+    entities: [User, Post, Comment],
+    dbName: ":memory:",
+    metadataProvider: ReflectMetadataProvider,
+    debug: ["query"],
+    logger: (msg) => {
+      if (msg.includes("insert into `user`")) soInsert++;
+      if (msg.endsWith("begin")) soBegin++;
+    },
+  });
+  await orm.schema.create();
+
+  const em = orm.em.fork();
+  for (let i = 0; i < SO_USER; i++) {
+    em.create(User, { name: `User ${i}`, email: `u${i}@example.com` });
+    await em.flush();
+  }
+
+  console.log("so cau insert vao user:", soInsert);
+  console.log("so begin:", soBegin);
+  await orm.close(true);
+}
+
+main();

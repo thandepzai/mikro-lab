@@ -1,0 +1,57 @@
+// BAI 19C — Mot DB chung, moi test chay trong transaction roi rollback
+// DOAN TRUOC KHI CHAY: 2 test co xanh het khong? Data cua test "Moi" con lai sau khi rollback khong? ->
+import "reflect-metadata";
+import assert from "node:assert/strict";
+import { after, afterEach, before, beforeEach, test } from "node:test";
+import { MikroORM } from "@mikro-orm/sqlite";
+import { ReflectMetadataProvider } from "@mikro-orm/decorators/legacy";
+import { User } from "./entities/User";
+import { Post } from "./entities/Post";
+import { Comment } from "./entities/Comment";
+import { taoBangVaSeed } from "./orm";
+
+const khoiTao = () =>
+  MikroORM.init({
+    entities: [User, Post, Comment],
+    dbName: ":memory:",
+    metadataProvider: ReflectMetadataProvider,
+    debug: ["query"],
+  });
+
+let orm: Awaited<ReturnType<typeof khoiTao>>;
+
+let em: typeof orm.em;
+
+before(async () => {
+  console.log("[before] dung DB + seed 3 user");
+  orm = await khoiTao();
+  await taoBangVaSeed(orm);
+});
+
+after(async () => {
+  console.log("[after] dong DB");
+  await orm.close(true);
+});
+
+beforeEach(async () => {
+  console.log("[beforeEach] mo to nhap");
+  em = orm.em.fork();
+  await em.begin();
+});
+
+afterEach(async () => {
+  console.log("[afterEach] xe to nhap");
+  // await em.rollback();
+});
+
+test("tao them user Moi thi co 4 user", async () => {
+  console.log("[test Moi] bat dau");
+  em.create(User, { name: "Moi", email: "moi@example.com" });
+  await em.flush();
+  assert.equal(await em.count(User), 4);
+});
+
+test("DB vua seed thi co 3 user", async () => {
+  console.log("[test dem 3] bat dau");
+  assert.equal(await em.count(User), 3);
+});
