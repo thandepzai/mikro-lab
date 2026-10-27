@@ -20,7 +20,8 @@ Luyện lại 20 bài MikroORM của mikro-lab **theo đúng form backend work**
 
 - Xong: khung chạy được. Tạo/đọc User và Post qua API, log SQL đúng.
 - **Chưa commit.** `git status` có file sửa, file xoá (code v7) và file mới.
-- Chưa làm: bài nào trong 20 bài (bước 3 và 5 của `WORK-FORM.md`).
+- Xong bài 8 (`src/bai-work/08-populate-n-plus-1/README.md`): N+1 = 15 query, populate = 3 query.
+- Chưa làm: các bài còn lại (bước 3 và 5 của `WORK-FORM.md`).
 
 ## Chạy
 
@@ -55,15 +56,14 @@ Entity: `User` (name, email hidden, posts hidden), `Post` (title, author, commen
 
 ## Việc tiếp theo
 
-1. Commit khung (hỏi người dùng trước, họ chưa duyệt).
-2. Bài 8: endpoint N+1 và bản `populate` trong `lab`, xem log SQL. BE dùng `populate(` 492 chỗ.
-3. Thứ tự còn lại: 10, 11, rồi 3, 16, 17, rồi 6, 7, 9, rồi các bài khác.
-4. Mỗi bài ghi README ở `src/bai-work/NN-ten-bai/`, kèm "ở BE file nào làm đúng việc này".
+1. Thứ tự còn lại: 10, 11, rồi 3, 16, 17, rồi 6, 7, 9, rồi các bài khác.
+2. Mỗi bài ghi README ở `src/bai-work/NN-ten-bai/`, kèm "ở BE file nào làm đúng việc này".
 
 ## Bẫy môi trường
 
 - Đừng `pkill -f "nest start"`: bị chặn, và có thể giết nhầm server Nest khác của người dùng. Chạy server bằng `run_in_background`, dừng bằng `TaskStop` đúng task ID.
 - macOS dùng BSD `sed`: `sed -i '/x/d' file` lỗi. Dùng Edit hoặc python.
+- Cổng 3100 có thể còn server cũ (`dist/main`) từ phiên trước: chạy lab bằng `PORT=3101`.
 - Cổng 5433 là Postgres của dự án khác (`map-crm-postgres-1`). Lab dùng 5434, đừng đụng.
 - `tsconfig.json` không bật `declaration`: bật lên thì `BaseRepository` lỗi TS4053 do kiểu `HiddenProps` của MikroORM.
 - Tiêu chí giao tiếp của người dùng: tiếng Việt, ngắn, mỗi lượt một ý, không dùng ①②③, không comment trong code, không `any`.
