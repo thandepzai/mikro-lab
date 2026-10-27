@@ -60,7 +60,7 @@ src/bai-work/NN-ten-bai/      <- mỗi bài: README + code viết bằng BaseRep
 ## 5. Tiến độ
 
 - [x] Bước 1–2: hạ v6.4.12 + Postgres (docker, cổng 5434), `app.module.ts` chép cấu hình BE, khung `_core` rút gọn, module `lab` (User, Post, Comment).
-- [ ] Bước 3: luyện 20 bài theo thứ tự 8, 10, 11 → 3, 16, 17 → 6, 7, 9 → còn lại. Xong: bài 8.
+- [ ] Bước 3: luyện 20 bài theo thứ tự 8, 10, 11 → 3, 16, 17 → 6, 7, 9 → còn lại. Xong: bài 8, 10.
 - [ ] Bước 5: bài 13, 18, 19.
 
 ## 6. Chạy

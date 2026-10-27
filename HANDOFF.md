@@ -19,9 +19,12 @@ Luyện lại 20 bài MikroORM của mikro-lab **theo đúng form backend work**
 ## Trạng thái
 
 - Xong: khung chạy được. Tạo/đọc User và Post qua API, log SQL đúng.
-- **Chưa commit.** `git status` có file sửa, file xoá (code v7) và file mới.
+- Đã commit và push lên nhánh `work-form` (cuối phiên 2026-10-27).
 - Xong bài 8 (`src/bai-work/08-populate-n-plus-1/README.md`): N+1 = 15 query, populate = 3 query.
-- Chưa làm: các bài còn lại (bước 3 và 5 của `WORK-FORM.md`).
+- Xong bài 10 (`src/bai-work/10-query-builder/README.md`): `qb().execute()` trả object trơn, `GET /lab/bai10/posts-per-user` đã chạy đúng.
+- **Bước tiếp theo: bài 11 (Transaction).** Mới giải thích ý chính, chưa viết code. Kế hoạch: 2 endpoint, một cái không bọc, một cái bọc bằng `runInTransaction` (BE: `module/_core/infras/orm/mikro/util.ts`), cả hai ném lỗi ở bước 2 rồi so sánh log `commit` và `rollback`. Ghi chú bài 11 bản v7 ở `src/bai/11-transaction/README.md`.
+- Chưa làm: bài 11 trở đi (bước 3 và 5 của `WORK-FORM.md`).
+- Cách dạy người dùng muốn: mỗi lượt một ý, bảng nhỏ và một câu chốt, người dùng tự chạy và dán log, không dán log dài.
 
 ## Chạy
 
