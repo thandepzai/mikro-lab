@@ -22,8 +22,9 @@ Luyện lại 20 bài MikroORM của mikro-lab **theo đúng form backend work**
 - Đã commit và push lên nhánh `work-form` (cuối phiên 2026-10-27).
 - Xong bài 8 (`src/bai-work/08-populate-n-plus-1/README.md`): N+1 = 15 query, populate = 3 query.
 - Xong bài 10 (`src/bai-work/10-query-builder/README.md`): `qb().execute()` trả object trơn, `GET /lab/bai10/posts-per-user` đã chạy đúng.
-- **Bước tiếp theo: bài 11 (Transaction).** Mới giải thích ý chính, chưa viết code. Kế hoạch: 2 endpoint, một cái không bọc, một cái bọc bằng `runInTransaction` (BE: `module/_core/infras/orm/mikro/util.ts`), cả hai ném lỗi ở bước 2 rồi so sánh log `commit` và `rollback`. Ghi chú bài 11 bản v7 ở `src/bai/11-transaction/README.md`.
-- Chưa làm: bài 11 trở đi (bước 3 và 5 của `WORK-FORM.md`).
+- Xong bài 11 (`src/bai-work/11-transaction/README.md`): không bọc thì `commit` ngay, bọc `runInTransaction` thì `rollback`, lồng nhau sinh `savepoint`.
+- **Bước tiếp theo: bài 3** (theo thứ tự 8, 10, 11 → 3, 16, 17).
+- Chưa làm: các bài còn lại (bước 3 và 5 của `WORK-FORM.md`).
 - Cách dạy người dùng muốn: mỗi lượt một ý, bảng nhỏ và một câu chốt, người dùng tự chạy và dán log, không dán log dài.
 
 ## Chạy
@@ -53,7 +54,7 @@ Entity: `User` (name, email hidden, posts hidden), `Post` (title, author, commen
 ## Phát hiện về BE (đã kiểm chứng bằng chạy thật)
 
 1. `BaseRepository.create/build` mặc định `excludeRelation = true` → xoá mọi quan hệ khỏi data. Tạo `Post` với `author` phải truyền `{ excludeRelation: false }` (xem `PostService.createWithAuthor`). Không truyền thì lỗi `Value for Post.author is required`.
-2. `app.module.ts` gọi `MikroORM.init` lần hai rồi `setGlobalORM` → có 2 ORM instance. `runInTransaction` dùng instance thứ hai. **Chưa kiểm chứng hành vi**, soi ở bài 11.
+2. `app.module.ts` gọi `MikroORM.init` lần hai rồi `setGlobalORM` → có 2 ORM instance. `runInTransaction` dùng instance thứ hai. **Đã kiểm chứng ở bài 11:** vẫn rollback và savepoint đúng với `insert` của repository.
 3. `flushMode: COMMIT` + `persistOnCreate: false` → `em.create` không tự persist, query giữa chừng không tự flush.
 4. BE không dùng Filters, không có migrator, không có file test nào. Bài 13, 18, 19 là bản "nếu thêm thì thêm thế nào".
 
