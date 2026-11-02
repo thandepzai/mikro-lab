@@ -72,7 +72,29 @@ MikroORM có nhiều "phòng ban":
 | URL API | `@Controller(...)` + `@Post(...)` trong controller |
 | SQL đang chạy | `debug: true` ở `app.module.ts`, xem log server |
 
+## Ý 2: Nest tự `new` và lắp các lớp (DI)
+
+Nest giữ một `Map`: key là class (hoặc chuỗi), value là object đã `new`. Lúc `NestFactory.create` nó đi từ dưới lên:
+
+```ts
+container.set(EntityManager, em);
+container.set(UserRepository, new UserRepository(container.get(EntityManager)));
+container.set(Bai11Service, new Bai11Service(container.get(UserRepository)));
+```
+
+| Mảnh | Việc làm |
+|---|---|
+| Kiểu tham số constructor | Key để tra trong `Map` ("tôi cần gì") |
+| `providers` | Những class Nest được phép `new` ("có những gì") |
+| `exports` + `imports` | Cho module khác dùng ké provider |
+| `forFeature([User])` | Bỏ `em.getRepository(User)` vào `Map` với key `"UserRepository"` |
+| `@InjectRepository(User)` | Nhãn: tra key `"UserRepository"` (vì `EntityRepository<User>` mất `<User>` khi chạy) |
+
+Lab và BE inject thẳng `EntityManager` (có sẵn toàn app nhờ `forRoot`) rồi `super(em, User)` tự gọi `em.getRepository(User)` → về lý thuyết không cần `forFeature`. **Chưa chạy thử bỏ `forFeature`.**
+
+Câu chốt: decorator chỉ là nhãn, Nest đọc nhãn để biết lấy gì trong `Map`.
+
 ## Học tiếp
 
-- Ý 2: `lab.module.ts` và constructor — Nest biết controller nào dùng service nào nhờ đâu.
+- ~~Ý 2~~ xong. Thí nghiệm còn treo: bỏ `forFeature` xem app có start không; xoá `Bai11Service` khỏi `providers` xem lỗi lúc start hay lúc gọi.
 - Ý 3: `app.module.ts` — cấu hình ORM, `MikroOrmMiddleware`, 2 ORM instance.

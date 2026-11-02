@@ -1,6 +1,6 @@
 # HANDOFF — nhánh `work-form`
 
-Cập nhật: 2026-10-27. Đưa file này (và `WORK-FORM.md`) cho Claude ở phiên mới là đủ để làm tiếp.
+Cập nhật: 2026-11-03. Đưa file này (và `WORK-FORM.md`) cho Claude ở phiên mới là đủ để làm tiếp.
 
 ## Mục tiêu
 
@@ -23,9 +23,21 @@ Luyện lại 20 bài MikroORM của mikro-lab **theo đúng form backend work**
 - Xong bài 8 (`src/bai-work/08-populate-n-plus-1/README.md`): N+1 = 15 query, populate = 3 query.
 - Xong bài 10 (`src/bai-work/10-query-builder/README.md`): `qb().execute()` trả object trơn, `GET /lab/bai10/posts-per-user` đã chạy đúng.
 - Xong bài 11 (`src/bai-work/11-transaction/README.md`): không bọc thì `commit` ngay, bọc `runInTransaction` thì `rollback`, lồng nhau sinh `savepoint`.
-- Đang học lại cấu trúc dự án (`src/bai-work/00-cau-truc-du-an/README.md`): xong ý 1 (luồng request) và `main.ts`. **Tiếp theo: ý 2 `lab.module.ts` + constructor, rồi ý 3 `app.module.ts`.** Sau đó mới sang bài 3.
+- Đang học lại cấu trúc dự án (`src/bai-work/00-cau-truc-du-an/README.md`): xong ý 1 (luồng request), `main.ts`, ý 2 (DI: `providers`, constructor, `forFeature`/`@InjectRepository`, ngày 2026-11-03). **Tiếp theo: ý 3 `app.module.ts`.** Người học thấy cần học kỹ lại NestJS cơ bản; giải thích DI bằng `Map` key→object thì hiểu. Sau đó mới sang bài 3.
 - Chưa làm: các bài còn lại (bước 3 và 5 của `WORK-FORM.md`).
 - Cách dạy người dùng muốn: mỗi lượt một ý, bảng nhỏ và một câu chốt, người dùng tự chạy và dán log, không dán log dài.
+
+## Lộ trình NestJS cơ bản (chốt 2026-11-03, học trước rồi mới quay lại bài MikroORM)
+
+Học trên chính code lab, mỗi bài một ý, viết lại bằng JS thuần trước.
+
+- [x] N1. DI container: ai `new`, `Map` key→object, `providers`, `forFeature`/`@InjectRepository` (ghi ở Ý 2 của `src/bai-work/00-cau-truc-du-an/README.md`)
+- [ ] N2. Module: `imports`/`exports`, module global (vì sao `EntityManager` dùng khắp nơi). Soi `lab.module.ts`, `app.module.ts` (gộp với Ý 3)
+- [ ] N3. Decorator: `@Controller`, `@Post`, `@Body` là nhãn, Nest đọc nhãn thế nào. Soi `controller/*.ts`
+- [ ] N4. Vòng đời request: middleware → pipe → controller. Soi `MikroOrmMiddleware`, `ValidationPipe`
+- [ ] N5. Scope: service `new` một lần mà `em` vẫn riêng mỗi request → nối sang bài 3, 16, 17
+
+Thí nghiệm còn treo ở N1: bỏ `forFeature` xem app có start không; xoá `Bai11Service` khỏi `providers` xem lỗi lúc start hay lúc gọi. Nhớ `npm install` sau khi chuyển sang nhánh này.
 
 ## Chạy
 
