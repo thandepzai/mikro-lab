@@ -23,7 +23,7 @@ Luyện lại 20 bài MikroORM của mikro-lab **theo đúng form backend work**
 - Xong bài 8 (`src/bai-work/08-populate-n-plus-1/README.md`): N+1 = 15 query, populate = 3 query.
 - Xong bài 10 (`src/bai-work/10-query-builder/README.md`): `qb().execute()` trả object trơn, `GET /lab/bai10/posts-per-user` đã chạy đúng.
 - Xong bài 11 (`src/bai-work/11-transaction/README.md`): không bọc thì `commit` ngay, bọc `runInTransaction` thì `rollback`, lồng nhau sinh `savepoint`.
-- **Bước tiếp theo: bài 3** (theo thứ tự 8, 10, 11 → 3, 16, 17).
+- Đang học lại cấu trúc dự án (`src/bai-work/00-cau-truc-du-an/README.md`): xong ý 1 (luồng request) và `main.ts`. **Tiếp theo: ý 2 `lab.module.ts` + constructor, rồi ý 3 `app.module.ts`.** Sau đó mới sang bài 3.
 - Chưa làm: các bài còn lại (bước 3 và 5 của `WORK-FORM.md`).
 - Cách dạy người dùng muốn: mỗi lượt một ý, bảng nhỏ và một câu chốt, người dùng tự chạy và dán log, không dán log dài.
 
